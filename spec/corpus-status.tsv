@@ -1,0 +1,54 @@
+examples/aws-model-extension-with-icons.zc	rejected	line 12:1: unknown macro AWS_PROVIDER
+examples/aws-namespace-compat.zc	rejected	line 9:1: unknown macro NS_DIMENSION
+examples/bitemporal-history-replay.zc	rejected	line 10:1: unknown macro BT_TIMEPOINT
+examples/config-declarative-macros.zc	rejected	line 9:1: unknown macro CFG_DOC
+examples/diff-patch-demo.zc	rejected	line 41:1: unknown macro SNAPSHOT
+examples/discovery-api/sample-model.zc	accepted	
+examples/everparse-interop-demo.zc	rejected	line 8:1: unknown macro EP_SPEC
+examples/generated/everparse-2505-17335-extension.zc	rejected	line 14:1: unknown macro EP_SPEC
+examples/generated/tf_api_model.zc	rejected	line 14:1: unknown macro TF_OPERATION
+examples/k8s-helm-compat.zc	rejected	line 8:1: unknown macro KHC_DOC
+examples/kubernetes-compat-negative.zc	rejected	line 10:1: unknown macro KHC_DOC
+examples/kubernetes-compat.zc	rejected	line 8:1: unknown macro KHC_DOC
+examples/lean4-integration/category-theory-spec.zc	rejected	line 16:1: unknown macro CT_CATEGORY
+examples/macro-extension/lib/10-grants.zc	accepted	
+examples/macro-extension/lib/20-service-extension.zc	accepted	
+examples/macro-extension/model.zc	rejected	line 3:1: unknown macro SERVICE_EXTENSION
+examples/model-substrate/book-loan/expected.expanded.zc	accepted	
+examples/model-substrate/book-loan/model.zc	rejected	line 13:1: unknown macro MODEL_ENTITY
+examples/namespace-pn-nd-extension.zc	rejected	line 10:1: unknown macro NS_DIMENSION
+examples/org-pn-nd-embedding.zc	rejected	line 10:1: unknown macro ORG
+examples/process-algebra-checks.zc	rejected	line 8:1: unknown macro TPL_VISIBLE
+examples/proof-evidence/contracts.zc	rejected	line 15:1: unknown macro LEAN_PROOF
+examples/rbac-dac-orange-book.zc	rejected	line 11:1: unknown macro RBD_SUBJECT
+examples/request-form-recursive.zc	rejected	line 8:1: unknown macro RF_REQUEST
+examples/souffle-transitive-closure.zc	rejected	line 4:1: unknown macro SOUFFLE_BINARY_RELATION
+examples/theorem-dsl-incident.zc	rejected	line 8:1: unknown macro THM_COMPONENT
+examples/theorem-impact-devops-sre.zc	rejected	line 11:1: unknown macro THM_COMPONENT
+examples/tiny.zc	accepted	
+libsets/aws-model/aws-model-macros.zc	accepted	
+libsets/aws-namespace/aws-model-macros.zc	accepted	
+libsets/aws-namespace/aws-namespace-bridge-macros.zc	accepted	
+libsets/aws-namespace/namespace-pn-nd-macros.zc	accepted	
+libsets/aws-transfer-family/tf-macros.zc	accepted	
+libsets/bitemporal/bitemporal-macros.zc	accepted	
+libsets/config-declarative/config-declarative-macros.zc	accepted	
+libsets/diff-patch/macros.zc	accepted	
+libsets/discovery-api/discovery-api-rules.zc	accepted	
+libsets/everparse-interop/everparse-interop-macros.zc	accepted	
+libsets/k8s-helm-compat/k8s-helm-compat-macros.zc	accepted	
+libsets/model-substrate/00-model-structure.zc	accepted	
+libsets/model-substrate/05-model-intent.zc	accepted	
+libsets/model-substrate/10-scenario.zc	accepted	
+libsets/model-substrate/20-model-bridges.zc	accepted	
+libsets/model-substrate/30-model-coherence.zc	accepted	
+libsets/namespace-pn-nd/namespace-pn-nd-macros.zc	accepted	
+libsets/org-pn-nd/org-pn-nd-embedding-macros.zc	accepted	
+libsets/process-algebra/process-algebra-macros.zc	accepted	
+libsets/proof-evidence/proof-evidence-macros.zc	accepted	
+libsets/rbac-dac/rbac-dac-macros.zc	accepted	
+libsets/request-form/request-form-macros.zc	accepted	
+libsets/souffle-compat/souffle-compat-macros.zc	accepted	
+libsets/theorem-dsl-ci/category-theory-macros.zc	accepted	
+libsets/theorem-dsl-ci/theorem-dsl-macros.zc	accepted	
+libsets/theorem-dsl-ci/theorem-impact-macros.zc	accepted	

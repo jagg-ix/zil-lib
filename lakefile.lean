@@ -12,3 +12,7 @@ require «zil-lean» from git "https://github.com/jagg-ix/zil-lean.git" @ "4f6e1
 
 @[default_target] lean_exe zilLib where
   root := `ZilLib.CLI.Main
+
+/-- Tests whose `run_cmd` blocks read the shipped library files; they run when the module is compiled. -/
+lean_exe zilLibTests where
+  root := `ZilLib.Test.Main
