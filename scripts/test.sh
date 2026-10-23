@@ -78,6 +78,7 @@ if [[ "$full" -eq 1 ]]; then
   if cmp -s "$work/tf_api_model.zc" examples/generated/tf_api_model.zc; then pass "the Transfer Family model regenerates byte for byte"
   else fail "the Transfer Family model regenerates byte for byte"; fi
   step "macro matrix: 18 rows equal their goldens, compile and typecheck" scripts/matrix.sh --skip-build
+  step "README tour: every command on the page prints what the page shows" scripts/test-tour.sh --skip-build
 fi
 
 if [[ "$failures" -eq 0 ]]; then echo "zil-lib: all checks passed"; else echo "zil-lib: $failures check(s) failed" >&2; exit 1; fi

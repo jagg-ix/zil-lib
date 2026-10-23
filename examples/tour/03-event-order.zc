@@ -1,0 +1,51 @@
+MODULE tour.event.order.
+
+// Three services keep their own counters. An event carries the counters of the services that saw it.
+USE VC_ACTOR(shop).
+USE VC_ACTOR(carrier).
+USE VC_ACTOR(accounting).
+USE VC_COUNTER(c1).
+USE VC_COUNTER(c2).
+USE VC_COUNTER(c3).
+USE VC_LT(c1, c2).
+USE VC_LT(c2, c3).
+
+USE VC_EVENT(order_placed).
+USE VC_EVENT(payment_captured).
+USE VC_EVENT(shipment_dispatched).
+USE VC_EVENT(delivered).
+USE VC_EVENT(refund_issued).
+USE VC_EVENT(invoice_sent).
+
+USE VC_COMPONENT(order_placed, shop, c1).
+USE VC_COMPONENT(payment_captured, shop, c2).
+USE VC_COMPONENT(shipment_dispatched, shop, c3).
+USE VC_COMPONENT(shipment_dispatched, carrier, c1).
+USE VC_COMPONENT(delivered, carrier, c2).
+USE VC_COMPONENT(refund_issued, shop, c1).      // logged before the capture: the clocks disagree
+USE VC_COMPONENT(invoice_sent, accounting, c1).  // never saw the shop's clock: nothing links it
+
+// What the business requires.
+USE VC_REQUIRE_BEFORE(order_placed, payment_captured).
+USE VC_REQUIRE_BEFORE(payment_captured, shipment_dispatched).
+USE VC_REQUIRE_BEFORE(shipment_dispatched, delivered).
+USE VC_REQUIRE_BEFORE(payment_captured, refund_issued).
+USE VC_REQUIRE_BEFORE(payment_captured, invoice_sent).
+
+// Two ways to fail: the clocks contradict the order, or nothing proves it.
+RULE order_contradicted:
+IF ?a#must_precede@?b AND ?a#violation@?b
+THEN ?a#order_contradicted@?b.
+
+RULE order_unproven:
+IF ?a#order_broken@?b AND NOT ?a#order_contradicted@?b
+THEN ?a#order_unproven@?b.
+
+QUERY orders_kept:
+FIND ?a ?b WHERE ?a#order_kept@?b.
+
+QUERY orders_contradicted:
+FIND ?a ?b WHERE ?a#order_contradicted@?b.
+
+QUERY orders_unproven:
+FIND ?a ?b WHERE ?a#order_unproven@?b.

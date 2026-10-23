@@ -1,0 +1,15 @@
+MODULE tour.claims.need.proofs.
+
+// A claim about the checkout, written as data.
+assumption:percentIsAtMost100#kind@entity:assumption.
+lemma:subtractionNeverGrows#kind@entity:lemma.
+
+theorem:discountNeverExceedsPrice#kind@entity:theorem.
+theorem:discountNeverExceedsPrice#requires_assumption@assumption:percentIsAtMost100.
+theorem:discountNeverExceedsPrice#requires_lemma@lemma:subtractionNeverGrows.
+theorem:discountNeverExceedsPrice#ensures@guarantee:totalIsNeverAbovePrice.
+theorem:discountNeverExceedsPrice#criticality@value:high.
+
+// Name the Lean theorem that proves it, and the one behind the lemma.
+USE LEAN_PROOF(discountNeverExceedsPrice, ZilLib.Tour.discounted_le).
+USE LEAN_LEMMA_PROOF(subtractionNeverGrows, Nat.sub_le).

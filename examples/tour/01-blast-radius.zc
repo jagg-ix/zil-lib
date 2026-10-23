@@ -1,0 +1,39 @@
+MODULE tour.blast.radius.
+
+// Who calls whom.
+service:web#calls@service:checkout.
+service:checkout#calls@service:payments.
+service:checkout#calls@service:inventory.
+service:payments#calls@service:card_gateway.
+service:inventory#calls@service:warehouse_db.
+service:reports#calls@service:warehouse_db.
+
+// What a customer does starts at one service. Only one dependency has a fallback.
+journey:buy#starts_at@service:web.
+journey:browse_reports#starts_at@service:reports.
+service:warehouse_db#has_fallback@value:true.
+
+// A service depends on everything it calls, directly or through others.
+RULE depends_directly:
+IF ?a#calls@?b
+THEN ?a#depends_on@?b.
+
+RULE depends_through:
+IF ?a#depends_on@?b AND ?b#calls@?c
+THEN ?a#depends_on@?c.
+
+// A journey is exposed to everything its first service depends on.
+RULE journey_exposed:
+IF ?j#starts_at@?s AND ?s#depends_on@?x
+THEN ?j#exposed_to@?x.
+
+// Exposed to a service that has no fallback: a single point of failure.
+RULE single_point:
+IF ?j#exposed_to@?x AND NOT ?x#has_fallback@value:true
+THEN ?j#single_point_of_failure@?x.
+
+QUERY what_breaks_if_payments_is_down:
+FIND ?j WHERE ?j#exposed_to@service:payments.
+
+QUERY single_points:
+FIND ?j ?x WHERE ?j#single_point_of_failure@?x.

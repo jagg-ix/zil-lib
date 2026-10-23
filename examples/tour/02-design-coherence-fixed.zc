@@ -1,0 +1,55 @@
+MODULE tour.design.coherence.fixed.
+
+// A checkout, described three ways: what it is, what people want from it, and how it is tested.
+
+// Structure: an order moves through three states.
+USE MODEL_ENTITY(order).
+USE MODEL_OP(order_place, order).
+USE MODEL_OP(order_pay, order).
+USE MODEL_OP(order_ship, order).
+USE MODEL_OP(send_confirmation, order).
+USE MODEL_STATE(cart, order).
+USE MODEL_STATE(placed, order).
+USE MODEL_STATE(paid, order).
+USE MODEL_STATE(shipped, order).
+USE MODEL_INITIAL(cart).
+USE MODEL_TRANS(place, cart, submit, placed).
+USE MODEL_TRANS(pay, placed, charge, paid).
+USE MODEL_TRANS(ship, paid, dispatch, shipped).
+
+// Intent: who wants what.
+USE MODEL_ACTOR(shopper).
+USE MODEL_ACTOR(warehouse).
+USE MODEL_USECASE(place_order).
+USE MODEL_USECASE(pay_for_order).
+USE MODEL_USECASE(ship_order).
+USE MODEL_PARTICIPATES(shopper, place_order).
+USE MODEL_PARTICIPATES(shopper, pay_for_order).
+USE MODEL_PARTICIPATES(warehouse, ship_order).
+
+// Scenarios: how it is tested. Three steps, in order.
+USE SCENARIO_FEATURE(f_checkout, place_order).
+USE SCENARIO_CASE(s_happy_path, f_checkout).
+USE SCENARIO_GIVEN(g1, s_happy_path, 1, cart_has_items).
+USE SCENARIO_WHEN(w1, s_happy_path, 2, shopper_submits).
+USE SCENARIO_THEN(t1, s_happy_path, 3, order_is_placed).
+USE SCENARIO_THEN(t2, s_happy_path, 4, confirmation_email_is_sent).
+
+USE SCENARIO_FEATURE(f_fulfilment, ship_order).
+USE SCENARIO_CASE(s_ship_it, f_fulfilment).
+USE SCENARIO_GIVEN(g2, s_ship_it, 1, order_is_paid).
+USE SCENARIO_WHEN(w2, s_ship_it, 2, warehouse_dispatches).
+USE SCENARIO_THEN(t3, s_ship_it, 3, order_is_shipped).
+
+// Links between them.
+USE MODEL_COVERED_BY(place_order, s_happy_path).
+USE MODEL_COVERED_BY(pay_for_order, s_happy_path).
+USE SCENARIO_REALIZES(w1, order_place).
+USE SCENARIO_REALIZES(t1, place).
+USE SCENARIO_REALIZES(t2, send_confirmation).
+USE MODEL_COVERED_BY(ship_order, s_ship_it).
+USE SCENARIO_REALIZES(w2, order_ship).
+USE SCENARIO_REALIZES(t3, ship).
+
+// Derived facts and the coherence questions, under the prefix c.
+USE MODEL_COHERENCE(c).
