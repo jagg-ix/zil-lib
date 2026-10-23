@@ -102,7 +102,7 @@ wins, and the target says what to do about it.
   tests that need it run only with `--with-tool` and say *skipped: apalache-mc not found* otherwise. The macro extension is in the
   matrix of `libsets/` (qualified here once LIB-03 is done).
 - Every generated file is byte-stable: the same program gives the same bytes. The IR's SHA-256 appears in each report.
-- Public content policy (`PUBLIC-CONTENT-POLICY.md`): examples are invented; nothing from a private system.
+- Public content policy (the core's `PUBLIC-CONTENT-POLICY.md` applies here too): examples are invented; nothing from a private system.
 - A new test is shown to fail by a real rebuild of a deliberately broken implementation, not by a build that failed.
 
 ## Targets
@@ -145,8 +145,7 @@ APL-05 is accepted and runs in parallel with APL-10 to APL-14. S2 and S3 follow.
 
 Answer these in the contract before writing code.
 
-0. **Location of the toolkit.** Decided: `zil-lib`, a repository of its own (see *Where the work lives*). It is private until the
-   maintainer says otherwise.
+0. **Location of the toolkit.** Decided: `zil-lib`, a repository of its own (see *Where the work lives*). It is public (2026-10-23).
 1. **Sorts.** ZIL terms are untyped nodes. Use one uninterpreted sort for all nodes, or add optional signatures for
    relations (so a domain can be N users and M objects)? Signatures shrink the search a lot and also document policies;
    they are a language addition and need their own spec.

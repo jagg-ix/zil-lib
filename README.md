@@ -67,4 +67,4 @@ Edit the commit in `lakefile.lean`, run `lake update zil-lean`, then `scripts/te
 - The macro libraries (`libsets/`) are moving here from the core; `docs/move-libsets.md` is the plan. The vocabulary for declaring
   what to check (bounds, invariants, public projections, operations) is written as one of them.
 - Results are evidence within a bound and a depth, never a proof.
-- Examples are invented. Nothing from a private system enters this repository.
+- Examples are invented. Nothing from a private system enters this repository; the core's `PUBLIC-CONTENT-POLICY.md` applies.
