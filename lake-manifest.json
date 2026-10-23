@@ -1,0 +1,16 @@
+{"version": "1.2.0",
+ "packagesDir": ".lake/packages",
+ "packages":
+ [{"url": "https://github.com/jagg-ix/zil-lean.git",
+   "type": "git",
+   "subDir": null,
+   "scope": "",
+   "rev": "4f6e1f5b701c440e49166fc6c287eb3f6f703d62",
+   "name": "«zil-lean»",
+   "manifestFile": "lake-manifest.json",
+   "inputRev": "4f6e1f5b701c440e49166fc6c287eb3f6f703d62",
+   "inherited": false,
+   "configFile": "lakefile.lean"}],
+ "name": "«zil-lib»",
+ "lakeDir": ".lake",
+ "fixedToolchain": false}

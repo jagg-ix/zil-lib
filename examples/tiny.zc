@@ -1,0 +1,12 @@
+MODULE zil.lib.tiny.
+
+service:api#depends_on@service:db.
+service:db#operator@user:12.
+doc:readme#owner@user:10.
+
+RULE serviceOperator:
+IF ?service#depends_on@?dependency AND ?dependency#operator@?user
+THEN ?service#operator@?user.
+
+QUERY operators:
+FIND ?service ?user WHERE ?service#operator@?user.
