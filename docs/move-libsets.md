@@ -3,9 +3,10 @@
 Decision (2026-10-23): the macro libraries leave the core and live in `zil-lib`. This file is the plan: what moves, in what
 order, how each step is shown to work, and what has to be true before the core drops them.
 
-Progress (2026-10-23): LIB-01 to LIB-08 and LIB-12 are done and `scripts/test.sh --full` passes here (6 min 37 s, with failing
-`java`, `apalache-mc` and `clojure` programs on `PATH`). The libraries now exist twice. The core is untouched. The steps that
-publish or remove (LIB-09, LIB-10, LIB-11) wait for the maintainer.
+Progress (2026-10-23): LIB-01 to LIB-09, LIB-11 and LIB-12 are done. This repository is public, the libraries live only here, and the
+core (zil-lean `4c5a3ff`) no longer has `libsets/`. `scripts/test.sh --full` passes against the new core (7 min 51 s, with failing
+`java`, `apalache-mc` and `clojure` programs on `PATH`). Left: LIB-10 (a consumer that pins the core has to pin this repository for the
+libraries it reads), LIB-13 (`lib/`), LIB-14 (the checking vocabulary) and LIB-15 (one runner).
 
 Why: the core is the language and its engine. A macro library is data that the engine expands; a library collection has its own
 pace, its own examples and its own qualification, and depends on the core while the core depends on none of it. With the
@@ -39,7 +40,7 @@ libraries here, the vocabulary the toolkit needs (`docs/targets.md`, APL-05) is 
 
 | Consumer | How | Change |
 |---|---|---|
-| zil-lean | the matrix, three gates, the corpus script, `ModelSubstrate.lean`, README, INSTALLING, `bin/zil --help` text, 40 example references | LIB-11 |
+| zil-lean | the matrix, three gates, the corpus script, `ModelSubstrate.lean`, README, INSTALLING, `bin/zil --help` text, 40 example references | LIB-11 || done 2026-10-23: zil-lean pull request 19 (main `4c5a3ff`); tag `last-with-libsets` marks `4f6e1f5`; its lean profile passes with failing `java` and `clojure` programs on `PATH`; this repository's full gate passes against the new main. Differences from the plan: the 15 `lib/` and inline matrix rows and the core's runner stay (see LIB-13 and LIB-15), so no engine fixtures were needed and the core's test profile lost two steps, not three |
 | a project that pins the core | reads `libsets/...` paths through its pinned copy of the core | LIB-10 |
 | third parties | links and `--lib libsets/...` paths into the public core | a note in the core README and a tag (LIB-11) |
 
@@ -66,10 +67,10 @@ Each step is one pull request in the repository it names. Steps with the same pr
 | LIB-06 | Examples and corpus | a script lists the examples the matrix and gates name; they are here; this repository has its own `spec/corpus-status.tsv`; the core's still passes with the rest | LIB-03 | done 2026-10-23: 28 example files plus four library demos; `spec/corpus-status.tsv` has 54 files and every status equals the core's record |
 | LIB-07 | Generators and smoke tools | each runs here and writes what it wrote in the core, byte for byte | LIB-03 | done with a narrower scope than planned (see *Found while doing it*): `scripts/aws-namespace-smoke.sh` and `tools/tf-api-emit-zil.py` (regenerates `tf_api_model.zc` byte for byte) |
 | LIB-08 | Specifications and catalog | the specs are here, the library catalog is this repository's README, and no link in either points at a path that no longer exists | LIB-03 | done 2026-10-23: four specs and the library catalog (`README.md`); links checked |
-| LIB-09 | zil-lib public | its history is scanned, the maintainer agrees, and it is public | LIB-03 to LIB-08, the maintainer | not started |
+| LIB-09 | zil-lib public | its history is scanned, the maintainer agrees, and it is public | LIB-03 to LIB-08, the maintainer | done 2026-10-23: the history scans clean (no blocking line) and the repository is public |
 | LIB-10 | Consumers | a project that pins the core also pins zil-lib for the libraries it reads, and its chain gives the same result as before | LIB-09 | not started |
 | LIB-11 | Core removal | in one core pull request: `libsets/`, the matrix, goldens, runner, gates, tools, examples and tests that moved are gone; fixtures for the engine's tests are added; `scripts/test.sh` drops three steps and adds one; the README, `INSTALLING.md` and `bin/zil --help` point here; the corpus passes; `bin/zil test --profile lean` passes with failing `java` and `clojure` programs on `PATH`; a tag `last-with-libsets` marks the commit before | LIB-09, LIB-10, the maintainer | not started |
-| LIB-12 | Pin discipline | moving the core pin here runs the matrix and the gates; a script tries the core's current main without changing the pin and reports which goldens would change; a core pull request that changes expansion output says so | LIB-03 | done 2026-10-23: `scripts/try-core.sh [REV]` runs the corpus check and the matrix against another core commit in a scratch copy and says what would change |
+| LIB-12 | Pin discipline | moving the core pin here runs the matrix and the gates; a script tries the core's current main without changing the pin and reports which goldens would change; a core pull request that changes expansion output says so | LIB-03 | done 2026-10-23: `scripts/try-core.sh [REV]` runs the corpus check and the matrix against another core commit in a scratch copy and says what would change || done 2026-10-23, and used: the pin moved from `4f6e1f5` to `4c5a3ff` with the full gate as the check |
 | LIB-13 | `lib/` | decided, and if it moves, moved by the same steps as `libsets/` | LIB-11 | not started |
 | LIB-14 | The checking vocabulary | APL-05 (`docs/targets.md`) is written directly in `libsets/` here | LIB-03, APL-00 | not started |
 | LIB-15 | One runner | the core's `tools/macro_extension_matrix.sh` takes `--root DIR`, this repository calls it with its own matrix, and `scripts/matrix.sh` here is deleted | LIB-13 | not started |
