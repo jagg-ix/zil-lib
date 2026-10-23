@@ -16,7 +16,8 @@ is the work list, with the order, the tests and what each result may be called.
 | `ZilLib/` | the library; `Model.lean` reads a model through the core's parser |
 | `ZilLib/CLI/Main.lean` | the `zilLib` executable (`zilLib summary <model.zc>`) |
 | `scripts/test.sh` | the gate |
-| `docs/targets.md` | the work list |
+| `docs/targets.md` | the work list of the Apalache toolkit |
+| `docs/move-libsets.md` | the plan to move the macro libraries here |
 
 ## Build and test
 
@@ -38,7 +39,7 @@ Edit the commit in `lakefile.lean`, run `lake update zil-lean`, then `scripts/te
 ## Rules
 
 - No change to the core from here, and no Apalache, Java or other external tool in the core's build or tests.
-- The vocabulary for declaring what to check (bounds, invariants, public projections, operations) is a macro extension in the
-  core's `libsets/`, because that is where the macro libraries and the tool that qualifies them live.
+- The macro libraries (`libsets/`) are moving here from the core; `docs/move-libsets.md` is the plan. The vocabulary for declaring
+  what to check (bounds, invariants, public projections, operations) is written as one of them.
 - Results are evidence within a bound and a depth, never a proof.
 - Examples are invented. Nothing from a private system enters this repository.

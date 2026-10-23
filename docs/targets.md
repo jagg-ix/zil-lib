@@ -31,18 +31,17 @@ Three places, and the dependency runs one way: the toolkit uses ZIL, ZIL never u
 | Place | What goes there | Rule |
 |---|---|---|
 | ZIL core (`Zil/`, `bin/zil`, the language specs) | nothing new | No Apalache code, no `bin/zil apalache`, no `#zil_apalache_*` command, no change to the parser or the declaration kinds. The default profile never knows the tool exists. |
-| A macro extension in `libsets/` | the vocabulary for saying what to check: domain bounds, invariants, public projections, operations | Opt-in like `libsets/model-substrate`. It adds no relation kind and no syntax: every macro expands to ordinary tuples, rules and queries. It is qualified by `tools/macro_extension_matrix.sh` against a reviewed golden, and means nothing to the engine; the toolkit gives it meaning. |
+| A macro extension in `zil-lib`'s `libsets/` (see `docs/move-libsets.md`) | the vocabulary for saying what to check: domain bounds, invariants, public projections, operations | Opt-in like `libsets/model-substrate`. It adds no relation kind and no syntax: every macro expands to ordinary tuples, rules and queries. It is qualified by `tools/macro_extension_matrix.sh` against a reviewed golden, and means nothing to the engine; the toolkit gives it meaning. |
 | A toolkit, **in a repository of its own** (decided 2026-10-23: a clean architecture), a Lake package with its own executable and gate that depends on `zil-lean` at a pinned commit | the IR types and printer, the lowering, the runner, the trace reader, replay, evidence, the commands, the experiments | Reads a model after `bin/zil expand` (or the `Zil` library's `Program`). Replays every counterexample with the `Zil` evaluator. Optional JVM tool found at run time. |
 
 The toolkit is `zil-lib`, a repository of its own, so the one-way dependency is enforced by the layout and not by discipline: this
 repository cannot import it, build it or test it by accident. It requires `zil-lean` at a pinned commit and moves the pin
 deliberately, running its own gate on every move, the way other consumers of this repository do.
 
-The macro extension stays here, in `libsets/`, because that is where every macro library and the tool that qualifies them
-live, and because libraries that only give vocabulary to an outside tool already live here (`souffle-compat`,
-`acl2-interop`, `everparse-interop`). A library is data: it depends on nothing, and nothing in this repository depends on the
-toolkit. The toolkit's own documentation and examples are its business; this file is the seed of its work list and moves
-there when the repository exists, leaving a pointer here.
+The macro extension is written in `zil-lib`'s `libsets/`, as the first library in its new home (decided 2026-10-23: `libsets/`
+moves here from the core; the plan and its order are in `docs/move-libsets.md`, and APL-05 is LIB-14 there). A library is data:
+it depends on nothing, and nothing in the core depends on this repository. Until the move reaches `libsets/` here (LIB-03), APL-05
+can be developed against the same path shape. This file began in the core as a seed copy and is maintained here.
 
 Existing libraries already cover part of the vocabulary and are reused, not copied: `MODEL_STATE`, `MODEL_INITIAL`,
 `MODEL_TRANS` (transitions), `TIME_TICK`, `TIME_LT`, `TIME_AGE` (time), `VC_*` (vector clocks), `RBD_*` (subjects, roles,
@@ -101,7 +100,7 @@ wins, and the target says what to do about it.
 - `scripts/check-no-clojure.sh` passes.
 - The toolkit has its own gate. Its pure tests (IR types, printing, ITF parsing, replay on recorded traces) run without the tool;
   tests that need it run only with `--with-tool` and say *skipped: apalache-mc not found* otherwise. The macro extension is in the
-  core's macro matrix.
+  matrix of `libsets/` (qualified here once LIB-03 is done).
 - Every generated file is byte-stable: the same program gives the same bytes. The IR's SHA-256 appears in each report.
 - Public content policy (`PUBLIC-CONTENT-POLICY.md`): examples are invented; nothing from a private system.
 - A new test is shown to fail by a real rebuild of a deliberately broken implementation, not by a build that failed.
@@ -189,8 +188,7 @@ Starting points:
   failure, *tool unavailable* when the tool is missing. Never *proved*.
 - Record tool versions and exact commands in `spec/apalache-tool-notes.md`. A result without them cannot be reproduced.
 - Do not vendor the tool or its jar. The repository finds it on the machine and says so when it is not there.
-- Toolkit targets are worked in the toolkit repository once APL-02 exists, macro-extension targets in this one. A target
-  never edits both in one pull request.
+- A target names the repository it changes; none edits both the core and `zil-lib` in one pull request.
 - Do not merge to the main branch without the maintainer's word.
 
 ## Non-goals
