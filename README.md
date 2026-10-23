@@ -1,22 +1,23 @@
 # zil-lib
 
-[ZIL](https://github.com/jagg-ix/zil-lean) is a small language for writing down facts, rules and questions about a system, and getting
-answers that show their work. **zil-lib** is a set of ready-made macro libraries for ZIL, and a toolkit that checks ZIL models. This
-repository is not part of ZIL: it depends on the ZIL core at a pinned commit, and the core knows nothing of it.
+[ZIL](https://github.com/jagg-ix/zil-lean) is a small declarative language for describing a system as facts, rules and queries. ZIL can
+explain every derived fact: it records the rule and the facts that produced it, which is the fact's provenance. **zil-lib** is a
+collection of reusable macro libraries for ZIL, plus a toolkit for checking ZIL models. This repository is separate from ZIL: it depends
+on the ZIL core at a pinned commit, and the core has no dependency on it.
 
 Licensed under the [Apache License 2.0](LICENSE).
 
 - **`libsets/`**: opt-in macro libraries (model substrate, process algebra, proof evidence, discovery API, AWS, Souffle compatibility and
-  more), each qualified against a reviewed golden output by `scripts/matrix.sh`. A library is used with the core's `--lib` flag.
-- **The toolkit** (`ZilLib/`, started): checking ZIL models with [Apalache](https://apalache-mc.org), a symbolic model checker for TLA+: rules,
-  queries and administrative operations over all fact sets of a bounded size and all operation sequences of a bounded length, with every
-  counterexample replayed by the ZIL evaluator before it is reported. `docs/targets.md` is the work list, `docs/apalache-plan.md` the plan and
-  `docs/tool-notes.md` what was measured.
+  more). Each is tested against reviewed golden files by `scripts/matrix.sh`. A library is loaded with the core's `--lib` flag.
+- **The toolkit** (`ZilLib/`, in progress): model checking of ZIL models with [Apalache](https://apalache-mc.org), a symbolic model
+  checker for TLA+. It checks rules, queries and administrative operations over all fact sets up to a bounded size and all operation
+  sequences up to a bounded length, and replays every counterexample in the ZIL evaluator before reporting it. `docs/targets.md` is the
+  work list, `docs/apalache-plan.md` the plan and `docs/tool-notes.md` the record of what was measured.
 
-## Try it
+## Getting started
 
-You need `git` and [`elan`](https://github.com/leanprover/elan), which installs the Lean version this repository asks for. Nothing else:
-no Java, no Clojure, no database.
+The prerequisites are `git` and [`elan`](https://github.com/leanprover/elan), which installs the Lean toolchain version that this
+repository specifies. There are no other dependencies: no Java, Clojure or database.
 
 ```sh
 git clone https://github.com/jagg-ix/zil-lib
@@ -25,41 +26,44 @@ lake build ZilLib zil-lean/zil zil-lean/zilTheoremAudit zil-lean/Zil
 . examples/tour/helpers.sh
 ```
 
-The first build compiles the ZIL core; on a laptop it took about a minute. Lean prints warnings about functions that newer toolchains have deprecated
-in the core while it builds; they do not change the result.
+The first build compiles the ZIL core; it took about a minute on a laptop. While it builds, Lean prints deprecation warnings for the
+core's source code. They do not affect the result.
 
-The last line loads a few small shell helpers. Read them once; they are all the tooling the tour uses:
+The last command loads a few shell helper functions, which are all the tooling the tour needs:
 
 ```sh
 zil()   { lake env zil "$@"; }
 audit() { lake env zilTheoremAudit "$@"; }
 
-# ask FILE QUERY: the answers to a query, one per line
-ask()   { zil explain-query "$1" "$2" | awk -F'\t' '$1 == "witness" {print $3}'; }
+# query FILE NAME: print the result bindings of a query, one per line
+query() { zil explain-query "$1" "$2" | awk -F'\t' '$1 == "witness" {print $3}'; }
 
-# answers FILE QUERY...: the answers to each query on one line, or (none)
-answers() { local file="$1" q found; shift; for q in "$@"; do found="$(ask "$file" "$q" | paste -sd' ' -)"; echo "$q: ${found:-(none)}"; done; }
+# queries FILE NAME...: print the results of each query on one line, or (none)
+queries() { local file="$1" name results; shift; for name in "$@"; do results="$(query "$file" "$name" | paste -sd' ' -)"; echo "$name: ${results:-(none)}"; done; }
 
-# why FILE QUERY TEXT: how the first answer containing TEXT was derived: each rule that fired, and the facts it used
-why()   { zil explain-query "$1" "$2" | awk -F'\t' -v pat="$3" '
+# explain FILE NAME TEXT: print the derivation (provenance) of the first result whose binding contains TEXT:
+# each rule that was applied, with the IDs of the facts it used
+explain() { zil explain-query "$1" "$2" | awk -F'\t' -v pat="$3" '
   $1 == "witness" && goal == "" && index($3, pat) { goal = $4 }
   $1 == "origin" && $3 == "rule" { rule[$2] = $4; from[$2] = $5; args[$2] = $NF }
   function walk(id,  n, p, k) { if ((id in rule) && !(id in seen)) { seen[id] = 1; n = split(from[id], p, ","); for (k = 1; k <= n; k++) walk(p[k]) } }
   END { walk(goal); for (id = 0; id <= goal; id++) if (id in seen) printf "%2s  %-16s from %-4s %s\n", id, rule[id], from[id], args[id] }'; }
 
-# verdict MODEL: the audit's one line per theorem: its status, its name, and its proof or the reason it failed
-# (the audit exits 1 when a claim fails; the line says so, so the exit status is dropped here)
-verdict() { { audit "$1" - || true; } | awk -F'\t' '$1 == "theorem" {printf "%s  %s  %s\n", $3, $2, ($NF == "" ? $(NF - 1) : "reason: " $NF)}'; }
+# audit_summary MODEL: print one line per theorem from the audit: status, name, and its proof or the failure reason
+# (the audit exits with status 1 when a theorem fails, so that exit status is ignored here)
+audit_summary() { { audit "$1" - || true; } | awk -F'\t' '$1 == "theorem" {printf "%s  %s  %s\n", $3, $2, ($NF == "" ? $(NF - 1) : "reason: " $NF)}'; }
 ```
 
-## A tour: one small shop, four questions
+## A tour of ZIL: one small shop, four questions
 
-Everything below is in [`examples/tour/`](examples/tour). The shop is invented, and each question needs a different part of ZIL. The
-outputs are real: `scripts/test-tour.sh` runs every command on this page and fails if the output on the page is different.
+All files are in [`examples/tour/`](examples/tour). The shop is a synthetic example, and each question exercises a different feature of
+ZIL. The outputs on this page are real: `scripts/test-tour.sh` runs every command shown here and fails if its output differs from what
+the page shows.
 
-### 1. If a service goes down, which customer journeys break?
+### 1. Which user journeys are affected when a service fails?
 
-This one needs only the ZIL core. A fact is `subject#relation@object`. Write down who calls whom, and where each customer journey starts:
+This question needs only the ZIL core, with no library. A fact is a relation tuple of the form `subject#relation@object`. The facts below
+describe a service call graph, the entry point of each user journey, and which service has a fallback:
 
 ```zil
 // Who calls whom.
@@ -76,7 +80,8 @@ journey:browse_reports#starts_at@service:reports.
 service:warehouse_db#has_fallback@value:true.
 ```
 
-Then say what follows from the facts. A rule has an `IF` side and a `THEN` side, and `?x` is a variable:
+Rules derive new facts from existing ones. A rule has an `IF` part (the premises) and a `THEN` part (the conclusion), and `?x` denotes a
+variable:
 
 ```zil
 RULE depends_directly:
@@ -98,13 +103,14 @@ IF ?j#exposed_to@?x AND NOT ?x#has_fallback@value:true
 THEN ?j#single_point_of_failure@?x.
 ```
 
-Look at what these four rules do. `depends_through` uses its own conclusion (`depends_on`) as a premise, so a chain of calls of any length is
-followed until nothing new turns up. And `single_point` says `NOT`: a journey is exposed with no safety net.
+Two features are worth noting. `depends_through` is recursive: its conclusion (`depends_on`) is also one of its premises, so the engine
+computes the transitive closure of the call graph by applying the rules until no new facts are derived. `single_point` uses negation
+(`NOT`): its last premise holds only when `has_fallback` cannot be derived for that service (negation as failure).
 
-Ask the questions:
+Run the queries:
 
 ```sh
-ask examples/tour/01-blast-radius.zc what_breaks_if_payments_is_down
+query examples/tour/01-blast-radius.zc what_breaks_if_payments_is_down
 ```
 
 ```text
@@ -112,7 +118,7 @@ j=journey.buy
 ```
 
 ```sh
-ask examples/tour/01-blast-radius.zc single_points
+query examples/tour/01-blast-radius.zc single_points
 ```
 
 ```text
@@ -122,12 +128,13 @@ j=journey.buy,x=service.inventory
 j=journey.buy,x=service.card_gateway
 ```
 
-`service.warehouse_db` is not in the list: the `buy` journey depends on it (through `inventory`), but it has a fallback.
+`service.warehouse_db` is not in the result: the `buy` journey depends on it transitively (through `inventory`), but it has a fallback.
 
-Now ask *why* the card gateway is a single point of failure. Every derived fact remembers the rule that produced it and the facts it used:
+To see why the card gateway is reported as a single point of failure, print its derivation. Every derived fact records the rule that
+produced it and the facts that rule used (its provenance):
 
 ```sh
-why examples/tour/01-blast-radius.zc single_points x=service.card_gateway
+explain examples/tour/01-blast-radius.zc single_points x=service.card_gateway
 ```
 
 ```text
@@ -138,11 +145,12 @@ why examples/tour/01-blast-radius.zc single_points x=service.card_gateway
 30  single_point     from 25   j=journey.buy,x=service.card_gateway
 ```
 
-Read it from the top: `web` calls `checkout` (a fact you wrote, number 0), so `web` depends on it (9); through `payments` (15) and on to
-the `card_gateway` (23); the `buy` journey starts at `web`, so it is exposed (25); and nothing gives the gateway a fallback, so it is a
-single point (30). The numbers are fact numbers; the ones that are not listed are your own input facts.
+Reading the derivation from top to bottom: `web` calls `checkout` (input fact 0), so `web` depends on `checkout` (derived fact 9).
+Through `payments` (15) that extends to `card_gateway` (23). The `buy` journey starts at `web`, so it is exposed to the gateway (25), and
+because the gateway has no fallback, it is a single point of failure (30). The numbers are fact IDs; IDs that are not listed (0, 1, 3
+and 6) are input facts that you wrote.
 
-The same program is also a Lean file:
+The same program can be compiled to a Lean source file:
 
 ```sh
 zil compile examples/tour/01-blast-radius.zc /tmp/Blast.lean Tour.Blast
@@ -154,17 +162,18 @@ grep 'def sourceProgram' /tmp/Blast.lean
 def sourceProgram : Zil.Program := {
 ```
 
-Lean accepts the file without a word. It holds the program as a Lean value, so a Lean theorem can talk about it; question 4 uses that
-side of the toolkit.
+Lean type-checks the file without errors. The file defines the program as a Lean value (`Zil.Program`), so Lean theorems can refer to
+it. Question 4 uses Lean to check a proof.
 
-### 2. Does the design agree with itself?
+### 2. Is the design consistent across its specifications?
 
-Real designs live in several places at once: a state machine says what the system *is*, use cases say what people *want*, and test
-scenarios say what is *checked*. Nothing makes them agree. The `model-substrate` library gives all three one vocabulary, so that
-disagreement becomes a query.
+A system design is usually spread over several artifacts: a state machine describes its structure and behavior, use cases describe its
+requirements, and test scenarios describe its verification. Nothing forces them to stay consistent. The `model-substrate` library puts all
+three in one vocabulary, so that inconsistencies can be found with queries.
 
-A library is a set of macros, and a macro is one line that stands for many facts. `USE MODEL_STATE(paid, order)` is one such line.
-The shop's checkout, in three groups of them:
+A library is a set of macros, and a macro invocation expands to a set of facts and rules. For example, `USE MODEL_STATE(paid, order)` is
+a macro invocation. The checkout model below has three parts: structure (a state machine), intent (actors and use cases) and scenarios
+(tests):
 
 ```zil
 // Structure: an order moves through three states.
@@ -210,8 +219,8 @@ USE SCENARIO_REALIZES(w1, order_place).
 USE SCENARIO_REALIZES(t1, place).
 ```
 
-Expand it with the library on the path. `explain-query` reads a plain file, so the macros are expanded first. Thirty-one lines of `USE`
-become 98 lines of facts and rules:
+Expand the macros with the library on the library path. (`explain-query` has no `--lib` option, so the file is expanded first.) The 31
+`USE` directives expand to 98 lines of facts and rules:
 
 ```sh
 grep -c '^USE' examples/tour/02-design-coherence.zc
@@ -224,11 +233,11 @@ awk 'END {print NR}' /tmp/design.zc
 98
 ```
 
-Now the three coherence questions the library defines: which use cases have no test, which tests belong to no use case, and which test
-steps check something no operation of the model does:
+The library defines three consistency queries: use cases that no test covers, test scenarios that are not linked to the model, and
+`Then` steps that realize no operation or transition of the model:
 
 ```sh
-answers /tmp/design.zc c_uncovered_usecases c_orphan_scenarios c_unrealized_then_steps
+queries /tmp/design.zc c_uncovered_usecases c_orphan_scenarios c_unrealized_then_steps
 ```
 
 ```text
@@ -237,8 +246,9 @@ c_orphan_scenarios: (none)
 c_unrealized_then_steps: st=t2
 ```
 
-Two real holes, found without running the shop. Nobody tests `ship_order`, and the step "confirmation email is sent" checks something no
-operation of the model does. `02-design-coherence-fixed.zc` closes both: a test for shipping, and an operation for the email. What changed:
+The queries report two defects, found by static analysis without running any code. No test covers the `ship_order` use case, and the
+step "confirmation email is sent" does not correspond to any operation in the model. `02-design-coherence-fixed.zc` fixes both by adding
+a shipping test and a `send_confirmation` operation. The `diff` between the two files:
 
 ```sh
 diff examples/tour/02-design-coherence.zc examples/tour/02-design-coherence-fixed.zc || true
@@ -267,7 +277,7 @@ diff examples/tour/02-design-coherence.zc examples/tour/02-design-coherence-fixe
 
 ```sh
 zil expand examples/tour/02-design-coherence-fixed.zc /tmp/design-fixed.zc --lib libsets/model-substrate
-answers /tmp/design-fixed.zc c_uncovered_usecases c_orphan_scenarios c_unrealized_then_steps
+queries /tmp/design-fixed.zc c_uncovered_usecases c_orphan_scenarios c_unrealized_then_steps
 ```
 
 ```text
@@ -276,11 +286,11 @@ c_orphan_scenarios: (none)
 c_unrealized_then_steps: (none)
 ```
 
-### 3. Did the events happen in the order the business requires?
+### 3. Were events recorded in the required order?
 
-Services that do not share a clock cannot tell which of two events came first. The `process-algebra` library keeps a vector clock per
-event and works out the order from those. Each service numbers its own events (`c1` is before `c2`, which is before `c3`), and an event
-lists the number each service had reached when it saw it:
+Services that do not share a clock cannot always tell which of two events happened first. The `process-algebra` library models vector
+clocks and derives the happened-before order from them. Each service counts its own events (`c1` < `c2` < `c3`), and each event carries a
+vector clock: the counter value of every service whose clock it includes:
 
 ```zil
 USE VC_COMPONENT(order_placed, shop, c1).
@@ -292,7 +302,7 @@ USE VC_COMPONENT(refund_issued, shop, c1).      // logged before the capture: th
 USE VC_COMPONENT(invoice_sent, accounting, c1).  // never saw the shop's clock: nothing links it
 ```
 
-Then what the business requires:
+Next, the required ordering constraints (the first event must happen before the second):
 
 ```zil
 // What the business requires.
@@ -303,8 +313,9 @@ USE VC_REQUIRE_BEFORE(payment_captured, refund_issued).
 USE VC_REQUIRE_BEFORE(payment_captured, invoice_sent).
 ```
 
-The library says which orders are kept and which are broken. Two rules of our own split the broken ones in two, because they need
-different action: the clocks *contradict* the order (the data says it went the other way), or nothing *proves* it either way (missing information):
+The library reports which constraints are satisfied (`order_kept`) and which are broken (`order_broken`). The two rules below split the
+broken constraints into two classes that need different follow-up: *contradicted*, where the vector clocks show the opposite order, and
+*unproven*, where the clocks are concurrent or incomplete, so neither order can be established:
 
 ```zil
 // Two ways to fail: the clocks contradict the order, or nothing proves it.
@@ -319,7 +330,7 @@ THEN ?a#order_unproven@?b.
 
 ```sh
 zil expand examples/tour/03-event-order.zc /tmp/order.zc --lib libsets/process-algebra
-for q in orders_kept orders_contradicted orders_unproven; do echo "$q:"; ask /tmp/order.zc $q | sed 's/^/  /'; done
+for q in orders_kept orders_contradicted orders_unproven; do echo "$q:"; query /tmp/order.zc $q | sed 's/^/  /'; done
 ```
 
 ```text
@@ -333,12 +344,13 @@ orders_unproven:
   a=vc.event.payment_captured,b=vc.event.invoice_sent
 ```
 
-The refund was logged with a clock that says it happened before the payment it refunds: a contradiction. The invoice comes from a service
-that never saw the shop's clock: no evidence either way. Collapsing the two into "wrong order" would send the wrong people to look.
+The refund's vector clock says it happened before the payment it refunds, which contradicts the constraint. The invoice's vector clock is
+concurrent with the payment's, because the accounting service never observed the shop's clock, so the data neither confirms nor contradicts
+the constraint. Reporting both as a generic ordering violation would send the investigation in the wrong direction.
 
-### 4. A claim that needs a proof
+### 4. Requiring a proof for a critical claim
 
-ZIL can hold a claim as data: a theorem, what it assumes, what it promises, how much it matters.
+ZIL can represent a claim as data: a theorem with its assumptions, its guarantee and its criticality.
 
 ```zil
 // A claim about the checkout, written as data.
@@ -352,7 +364,7 @@ theorem:discountNeverExceedsPrice#ensures@guarantee:totalIsNeverAbovePrice.
 theorem:discountNeverExceedsPrice#criticality@value:high.
 ```
 
-The `proof-evidence` library adds one macro for saying where the proof is:
+The `proof-evidence` library provides a macro that links a theorem to the Lean theorem that proves it:
 
 ```zil
 MACRO LEAN_PROOF(theorem, lean_name):
@@ -362,13 +374,13 @@ EMIT proof:{{lean_name}}#engine@engine:lean4.
 ENDMACRO.
 ```
 
-So the last two lines of `examples/tour/04-claims-need-proofs.zc` name the Lean theorem that proves the claim. ZIL ships an audit that
-refuses a high-criticality claim with no proof. The `verdict` helper shows the audit's one line per theorem (`audit` prints the whole
-report). Try the file with and without those lines:
+The last two lines of `examples/tour/04-claims-need-proofs.zc` use this macro to name the Lean theorem that proves the claim. The ZIL core
+includes a theorem audit that fails a high-criticality theorem when it has no proof evidence. The `audit_summary` helper prints one line
+per theorem (`audit` prints the full report). Run the audit on the file with and without those two lines:
 
 ```sh
 zil expand examples/tour/04-claims-need-proofs.zc /tmp/claims.zc --lib libsets/proof-evidence
-verdict /tmp/claims.zc
+audit_summary /tmp/claims.zc
 ```
 
 ```text
@@ -378,15 +390,15 @@ pass  theorem.discountNeverExceedsPrice  proof.ZilLib.Tour.discounted_le
 ```sh
 grep -v '^USE LEAN_' examples/tour/04-claims-need-proofs.zc > /tmp/claims-bare.zc
 zil expand /tmp/claims-bare.zc /tmp/claims-bare.expanded.zc --lib libsets/proof-evidence
-verdict /tmp/claims-bare.expanded.zc
+audit_summary /tmp/claims-bare.expanded.zc
 ```
 
 ```text
 fail  theorem.discountNeverExceedsPrice  reason: proof-evidence-missing
 ```
 
-The audit checks that a proof is *named*. That the named theorem really says what the claim says is Lean's job, and the theorem is in this
-repository ([`ZilLib/Tour.lean`](ZilLib/Tour.lean)), built with the library:
+The audit only checks that a proof is *referenced*. Whether the referenced theorem actually proves the claim is checked by Lean. The
+theorem is in this repository ([`ZilLib/Tour.lean`](ZilLib/Tour.lean)) and is compiled with the library:
 
 ```lean
 /-- Taking a percentage off a price never gives more than the price. -/
@@ -396,7 +408,7 @@ theorem discounted_le (price pct : Nat) (_h : pct ≤ 100) : price * (100 - pct)
     _ = 100 * price := Nat.mul_comm _ _
 ```
 
-Ask Lean's kernel what the proof rests on:
+To see which axioms the proof depends on, ask Lean:
 
 ```sh
 printf 'import ZilLib.Tour\n#print axioms ZilLib.Tour.discounted_le\n' | lake env lean --stdin
@@ -406,92 +418,96 @@ printf 'import ZilLib.Tour\n#print axioms ZilLib.Tour.discounted_le\n' | lake en
 'ZilLib.Tour.discounted_le' depends on axioms: [propext]
 ```
 
-Only `propext`, an axiom of Lean itself. So the claim is data, the proof is code that Lean checked, and the audit refuses a claim that
-names no proof. One link is not checked by any of them: that the name in the ZIL file is the name of a real Lean theorem. That is the one
-to guard in your own CI; a `#check` line for every proof name is enough.
+The proof depends only on `propext` (propositional extensionality), one of Lean's standard axioms. In summary: the claim is data, the
+proof is checked by the Lean kernel, and the audit rejects a high-criticality claim that references no proof. One link is not verified by
+any of these tools: that the name referenced in the ZIL file is the name of an existing Lean theorem. Enforce that in your own CI, for
+example with a `#check` command for each referenced proof name.
 
-### What you used
+### Summary of the features used
 
 | ZIL feature | Seen in |
 |---|---|
-| facts, rules, queries, and rules that use their own conclusions | 1 |
-| negation (`NOT`), and queries over what is *absent* | 1, 2, 3 |
-| the derivation behind every answer | 1 |
+| facts, rules, queries, and recursive rules | 1 |
+| negation (`NOT`) | 1, 2, 3 |
+| provenance (the derivation of each result) | 1 |
 | macros and libraries (`USE`, `--lib`) | 2, 3, 4 |
-| the same program as a Lean file | 1, 4 |
-| claims and proofs as data, audited | 4 |
+| compilation to Lean source | 1 |
+| theorem claims, proof evidence and the theorem audit | 4 |
 
-## Write your own library
+## Writing your own library
 
-A library is a directory of `.zc` files that hold `MACRO` definitions; `--lib DIR` puts them in scope. The `LEAN_PROOF`
-macro shown in question 4 is a whole one: a name, its parameters, and the facts it stands for. Start from one of the shorter libraries in
-`libsets/` (`proof-evidence` is 21 lines), put yours in a directory, and run `zil expand FILE - --lib YOUR_DIR`.
+A library is a directory of `.zc` files that contain `MACRO` definitions; `--lib DIR` makes them available. A macro consists of a name, a
+parameter list and a template of facts to emit (the `LEAN_PROOF` macro in question 4 is a complete example). To write your own, copy one
+of the small libraries in `libsets/` (`proof-evidence` is 21 lines) into a new directory, edit it, and run
+`zil expand FILE - --lib YOUR_DIR`.
 
-## What is here
+## Repository layout
 
 | Path | What |
 |---|---|
-| `lakefile.lean` | the package, and the pin: `require «zil-lean»` at one full commit |
-| `ZilLib/` | the library; `Model.lean` reads a model through the core's parser |
+| `lakefile.lean` | the Lake package definition and the dependency pin: `require «zil-lean»` at one full commit |
+| `ZilLib/` | the Lean library; `Model.lean` reads a model with the core's parser |
 | `ZilLib/CLI/Main.lean` | the `zilLib` executable (`zilLib summary <model.zc>`) |
-| `ZilLib/Tour.lean` | the Lean theorem behind question 4 of the tour |
-| `examples/tour/` | the tour: four small models, their helpers and the outputs the README shows |
-| `scripts/test.sh` | the gate |
-| `scripts/test-tour.sh` | runs every command in the tour and compares with the README |
-| `docs/targets.md` | the work list of the Apalache toolkit |
-| `docs/move-libsets.md` | the plan to move the macro libraries here |
+| `ZilLib/Tour.lean` | the Lean theorem used in question 4 of the tour |
+| `examples/tour/` | the four example models of the tour and the shell helper functions |
+| `scripts/test.sh` | the test suite (CI gate) |
+| `scripts/test-tour.sh` | runs every command in the tour and compares its output with this README |
+| `docs/targets.md` | the work list for the Apalache toolkit |
+| `docs/move-libsets.md` | the plan for moving the macro libraries here (completed) |
 
 ## Build and test
 
-With `lake` and `git` (Lean is installed by `elan` from `lean-toolchain`):
+The requirements are `lake` and `git`; `elan` installs the Lean toolchain named in `lean-toolchain`:
 
 ```sh
 scripts/test.sh
 lake exe zilLib summary examples/tiny.zc
 ```
 
-The gate runs with failing `java`, `apalache-mc` and `clojure` programs first on `PATH`: nothing here may need them to build or
-test. Apalache is a Java program and is found at run time when a target needs it.
+The test suite puts stub `java`, `apalache-mc` and `clojure` programs that always fail first on `PATH`, which shows that none of them is
+needed to build or test. Apalache is a Java program; it is looked up at run time, and only by features that use it. Add `--full` to also
+run the library tests, which takes about ten minutes.
 
 ## Libraries
 
-Opt-in macro libraries, selected with `--lib`. Each is qualified by the matrix (`scripts/matrix.sh`) except where noted.
+Opt-in macro libraries, loaded with `--lib`. Each one is covered by a golden-file test in the test matrix (`scripts/matrix.sh`) unless
+noted otherwise.
 
-| Library | Adds | Qualified by (matrix row: model) |
+| Library | Adds | Tested by (matrix row: model) |
 |---|---|---|
 | `libsets/aws-model` | a reusable AWS modeling layer: baseline catalog entities (service, region, control), compatibility targets and gap checks | `aws-model`: `examples/aws-model-extension-with-icons.zc` |
 | `libsets/aws-namespace` | the AWS layer with namespace-scoped compatibility | `aws-namespace`: `examples/aws-namespace-compat.zc` |
 | `libsets/aws-transfer-family` | the AWS Transfer Family domain: the resources of its API reference | `aws-transfer-family`: `examples/generated/tf_api_model.zc` |
 | `libsets/bitemporal` | a bitemporal layer (valid time and transaction time) | `bitemporal`: `examples/bitemporal-history-replay.zc` |
 | `libsets/config-declarative` | a declarative configuration layer | `config-declarative`: `examples/config-declarative-macros.zc` |
-| `libsets/diff-patch` | structural diffs and patchsets (not in the matrix: its rules spell variables as typed names and need a redesign) | not qualified yet |
+| `libsets/diff-patch` | structural diffs and patchsets (not in the matrix: its rules spell variables as typed names and need a redesign) | no test yet |
 | `libsets/discovery-api` | rules and queries over a Discovery-style API description (methods, schemas, fields, references) | `discovery-api`: `examples/discovery-api/sample-model.zc` |
 | `libsets/everparse-interop` | an EverParse interoperability layer | `everparse-interop`: `examples/everparse-interop-demo.zc` |
 | `libsets/k8s-helm-compat` | Kubernetes CRD and Helm compatibility modeling | `k8s-helm-compat`: `examples/k8s-helm-compat.zc` |
-| `libsets/model-substrate` | one vocabulary for structure, intent and scenarios, with coherence queries (qualified by `scripts/test-model-substrate.sh`) | `scripts/test-model-substrate.sh` |
+| `libsets/model-substrate` | a shared vocabulary for structure, requirements and test scenarios, with consistency queries | `scripts/test-model-substrate.sh` |
 | `libsets/namespace-pn-nd` | namespace hierarchy, n-dimensional context products, category-style morphism reachability and Petri-net style resolution flow | `namespace-pn-nd`: `examples/namespace-pn-nd-extension.zc` |
 | `libsets/org-pn-nd` | an organization, Petri net and n-dimensional embedding layer | `org-pn-nd`: `examples/org-pn-nd-embedding.zc` |
-| `libsets/process-algebra` | temporal process prefixes, pi-calculus hand-offs, vector clocks with required orders, a discrete clock with windows | `process-algebra`: `examples/process-algebra-checks.zc` |
-| `libsets/proof-evidence` | `LEAN_PROOF` and `LEAN_LEMMA_PROOF`, the kernel-evidence form `theorem-audit` reads | `proof-evidence`: `examples/proof-evidence/contracts.zc` |
-| `libsets/rbac-dac` | discretionary controls (owner grants) and role controls together | `rbac-dac`: `examples/rbac-dac-orange-book.zc` |
+| `libsets/process-algebra` | process-algebra constructs: temporal prefixes, pi-calculus hand-offs, vector clocks with required orderings, and a discrete clock with time windows | `process-algebra`: `examples/process-algebra-checks.zc` |
+| `libsets/proof-evidence` | `LEAN_PROOF` and `LEAN_LEMMA_PROOF`, the proof-evidence form that `theorem-audit` reads | `proof-evidence`: `examples/proof-evidence/contracts.zc` |
+| `libsets/rbac-dac` | discretionary access control (owner grants) combined with role-based access control | `rbac-dac`: `examples/rbac-dac-orange-book.zc` |
 | `libsets/request-form` | requests for data, effectful actions, compounds and recursive structures | `request-form`: `examples/request-form-recursive.zc` |
 | `libsets/souffle-compat` | relations and facts in the form a Souffle program uses | `souffle-compat`: `examples/souffle-transitive-closure.zc` |
 | `libsets/theorem-dsl-ci` | theorem, category-theory and theorem-impact DSLs | `category-theory`: `examples/lean4-integration/category-theory-spec.zc`, `theorem-dsl`: `examples/theorem-dsl-incident.zc`, `theorem-impact`: `examples/theorem-impact-devops-sre.zc` |
 
-## Moving the pin
+## Updating the pinned core
 
-Edit the commit in `lakefile.lean`, run `lake update zil-lean`, then `scripts/test.sh`. The gate checks that the lakefile and
-`lake-manifest.json` name the same full commit.
+Edit the commit in `lakefile.lean`, run `lake update zil-lean`, and then run `scripts/test.sh`. The test suite checks that
+`lakefile.lean` and `lake-manifest.json` name the same full commit.
 
-## Rules
+## Project rules
 
-- No change to the core from here, and no Apalache, Java or other external tool in the core's build or tests.
-- The macro libraries (`libsets/`) are moving here from the core; `docs/move-libsets.md` is the plan. The vocabulary for declaring
-  what to check (bounds, invariants, public projections, operations) is written as one of them.
-- Results are evidence within a bound and a depth, never a proof.
-- Examples are invented. Nothing from a private system enters this repository; the core's `PUBLIC-CONTENT-POLICY.md` applies.
+- This repository makes no changes to the core, and the core's build and tests never need Apalache, Java or any other external tool.
+- The macro libraries live in `libsets/`; they were moved here from the core (see `docs/move-libsets.md`). The vocabulary for declaring
+  what to check (bounds, invariants, public projections, operations) is planned as another library.
+- A bounded model-checking result is evidence up to its stated bounds, not a proof for all sizes.
+- All examples are synthetic. No content from a private system is included, and the core's `PUBLIC-CONTENT-POLICY.md` applies.
 
 ## License
 
-[Apache License 2.0](LICENSE). The tour examples and everything in `libsets/` are under it too, and a contribution is accepted under the same
-terms (section 5 of the license).
+This project is licensed under the [Apache License 2.0](LICENSE), including the tour examples and everything in `libsets/`.
+Contributions are accepted under the same license (section 5 of the license).

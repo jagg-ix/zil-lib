@@ -3,7 +3,7 @@
 
     python3 -I scripts/readme_tour.py [--show]
 
-Between the headings "## A tour" and "## Write your own library":
+Between the headings "## A tour" and "## Writing your own library":
   * every ```sh block runs, in order, with the tour helpers loaded and /tmp/ replaced by a scratch directory; when a ```text block follows,
     the block's standard output must equal it;
   * every ```zil and ```lean block must be a contiguous piece of one of the source files the tour uses, so a quoted line cannot go stale.
@@ -33,7 +33,10 @@ if helpers in [b for _, b in blocks(readme)]:
 else:
     fail("the README does not show examples/tour/helpers.sh as it is")
 
-start, end = readme.index("## A tour"), readme.index("## Write your own library")
+for heading in ("## A tour", "## Writing your own library"):
+    if heading not in readme:
+        sys.exit(f"FAIL  the README has no heading starting with {heading!r}")
+start, end = readme.index("## A tour"), readme.index("## Writing your own library")
 tour = blocks(readme[start:end])
 with tempfile.TemporaryDirectory(prefix="zil-tour.") as work:
     for position, (language, body) in enumerate(tour):
