@@ -1,12 +1,19 @@
 # zil-lib
 
-A toolkit that uses [ZIL](https://github.com/jagg-ix/zil-lean). It is not part of ZIL: it depends on the ZIL core at a
-pinned commit, and the core knows nothing of it.
+Macro libraries for [ZIL](https://github.com/jagg-ix/zil-lean), and a toolkit that uses it. This repository is not part of ZIL: it depends
+on the ZIL core at a pinned commit, and the core knows nothing of it.
 
-The first purpose is checking ZIL models with [Apalache](https://apalache-mc.org), a symbolic model checker for TLA+: rules,
-queries and administrative operations over all fact sets of a bounded size and all operation sequences of a bounded length,
-with every counterexample replayed by the ZIL evaluator before it is reported. Nothing of that is built yet; `docs/targets.md`
-is the work list, with the order, the tests and what each result may be called.
+- **`libsets/`**: opt-in macro libraries (model substrate, process algebra, proof evidence, discovery API, AWS, Souffle compatibility and
+  more), each qualified against a reviewed golden output by `scripts/matrix.sh`. Use one with the core's `--lib`:
+
+  ```sh
+  lake exe zil expand examples/process-algebra-checks.zc - --lib libsets/process-algebra
+  ```
+
+- **The toolkit** (`ZilLib/`, started): checking ZIL models with [Apalache](https://apalache-mc.org), a symbolic model checker for TLA+: rules,
+  queries and administrative operations over all fact sets of a bounded size and all operation sequences of a bounded length, with every
+  counterexample replayed by the ZIL evaluator before it is reported. `docs/targets.md` is the work list, `docs/apalache-plan.md` the plan and
+  `docs/tool-notes.md` what was measured.
 
 ## What is here
 
