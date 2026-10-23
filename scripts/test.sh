@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The gate of the toolkit.
 #
-#   scripts/test.sh [--skip-build] [--full]
+#   scripts/test.sh [--skip-build] [--full]   (--skip-build expects `lake build` to have built what --full needs)
 #
 # 1. the pin in lakefile.lean is the commit lake-manifest.json resolved, and is a full commit id;
 # 2. a clean build needs only lake and git: the gate runs with `java`, `apalache-mc` and `clojure` shims that exit 99 first on PATH;
@@ -43,7 +43,9 @@ else fail "the pin in lakefile.lean ($pinned) and lake-manifest.json ($resolved)
 
 # 2. build
 if [[ "$skip_build" -eq 0 ]]; then
-  if lake build >"$work/build.log" 2>&1; then pass "a build with failing java, apalache-mc and clojure shims succeeds"
+  # the library gates run the core's compiler and audit and typecheck against its library: build them with the package
+  targets=(); [[ "$full" -eq 1 ]] && targets=(zilLibTests zil-lean/zil zil-lean/zilTheoremAudit zil-lean/Zil)
+  if lake build "${targets[@]}" >"$work/build.log" 2>&1; then pass "a build with failing java, apalache-mc and clojure shims succeeds"
   else fail "build"; tail -20 "$work/build.log" >&2; fi
 fi
 
