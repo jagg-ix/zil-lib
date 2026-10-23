@@ -113,7 +113,7 @@ Facts that differ from the plan as first written; the plan above has been read w
    rows for the same libraries cover them.
 5. **Two generators stay in the core.** `generate_k8s_helm_compat.py` also writes the core's `lib/k8s-helm-compat-macros.zc` and needs PyYAML;
    `generate_everparse_2505_17335_extension.py` reads a PDF that is not in any repository. Neither can be shown to reproduce its output here.
-   `tf-api-emit-zil.py` moved: it regenerates the checked-in model byte for byte.
+   `tf-api-emit-zil.py` moved: it regenerates the checked-in model byte for byte. Its first step, `tf-api-extract.py`, moved with it unrun (it reads a PDF that is not in any repository).
 6. **Four more demos belong to libraries** than the matrix names: `diff-patch-demo.zc`, `kubernetes-compat.zc`, `kubernetes-compat-negative.zc` and
    `generated/everparse-2505-17335-extension.zc`. They moved.
 7. **Core files that name `libsets/` and must be edited at LIB-11:** `examples/lean4-integration/access-control.zc` and its `README.md` (commands

@@ -14,7 +14,7 @@ The macro libraries and what qualifies them were copied from zil-lean at commit
 | `scripts/test-model-substrate.sh`, `scripts/check-model-substrate-names.sh`, `scripts/test-extension-libraries.sh` | the scripts of the same names | compiler path; the names check also scans the core's `lib/` and examples; the substrate gate removes the test module's build output first |
 | `scripts/check-corpus.sh`, `spec/corpus-status.tsv` (54 files) | `scripts/check-corpus.sh`; the rows of the moved files | scope and compiler path; every recorded status equals the core's |
 | `scripts/aws-namespace-smoke.sh` | `tools/aws_namespace_smoke.sh` | compiler path |
-| `tools/tf-api-emit-zil.py`, `examples/generated/tf_api_schema.json` | the same paths | no |
+| `tools/tf-api-emit-zil.py`, `tools/tf-api-extract.py`, `examples/generated/tf_api_schema.json` | the same paths | no; the extractor reads the AWS Transfer Family API reference PDF, which is not in any repository, so it is moved without being run |
 | `examples/` (28 models and data files named by a matrix row or a gate, plus `diff-patch-demo.zc`, `kubernetes-compat*.zc` and the generated EverParse extension) | the same paths | no |
 | `spec/macro-extension-v1.md`, `model-substrate-v0.1.md`, `model-substrate-targets-v0.md`, `souffle-macro-compat-v1.md` | the same paths | script and test names |
 
