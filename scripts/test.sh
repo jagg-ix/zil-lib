@@ -3,6 +3,7 @@
 #
 #   scripts/test.sh [--skip-build] [--full]   (--skip-build expects `lake build` to have built what --full needs)
 #
+# 0. LICENSE is the Apache License 2.0 as apache.org publishes it (SHA-256 of LICENSE-2.0.txt);
 # 1. the pin in lakefile.lean is the commit lake-manifest.json resolved, and is a full commit id;
 # 2. a clean build needs only lake and git: the gate runs with `java`, `apalache-mc` and `clojure` shims that exit 99 first on PATH;
 # 3. the executable reads a model through the pinned core and reports what it holds.
@@ -34,6 +35,11 @@ for tool in java apalache-mc clojure clj; do
   chmod +x "$work/$tool"
 done
 export PATH="$work:$PATH"
+
+# 0. the licence
+licence_sum="$(python3 -I -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest())' LICENSE)"
+if [[ "$licence_sum" == "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30" ]]; then pass "LICENSE is the unmodified Apache License 2.0"
+else fail "LICENSE is not the unmodified Apache License 2.0 text (sha256 $licence_sum)"; fi
 
 # 1. the pin
 pinned="$(sed -n 's/^require «zil-lean» from git ".*" @ "\([0-9a-f]*\)".*$/\1/p' lakefile.lean)"
