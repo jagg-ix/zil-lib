@@ -1,0 +1,46 @@
+{
+  "#meta": {
+    "format": "ITF",
+    "format-description": "https://apalache-mc.org/docs/adr/015adr-trace.html",
+    "description": "Created by Apalache on Fri Oct 23 15:12:58 CST 2026",
+    "varTypes": {
+      "edge": "Set(<<NODE, NODE>>)"
+    }
+  },
+  "params": [
+    "Nodes"
+  ],
+  "vars": [
+    "edge"
+  ],
+  "states": [
+    {
+      "#meta": {
+        "index": 0
+      },
+      "Nodes": {
+        "#set": [
+          "a_OF_NODE",
+          "b_OF_NODE",
+          "c_OF_NODE"
+        ]
+      },
+      "edge": {
+        "#set": [
+          {
+            "#tup": [
+              "a_OF_NODE",
+              "b_OF_NODE"
+            ]
+          },
+          {
+            "#tup": [
+              "b_OF_NODE",
+              "a_OF_NODE"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
