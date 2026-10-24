@@ -1,0 +1,33 @@
+#!/bin/sh
+# A stand-in for apalache-mc in tests. It never starts a JVM: it reads the file name of the model and does what the real tool did in the
+# case that name stands for (docs/tool-notes.md): the exit code, the line "The outcome is: ...", and the trace under
+# <out-dir>/<model file name>/<timestamp>_<id>/violation.itf.json. A trace is a copy of counter.violation.itf.json.
+here="$(dirname "$0")"
+if [ "$1" = version ]; then echo "0.0.0-fake"; exit 0; fi
+if [ "$1" != check ]; then echo "unknown command $1" >&2; exit 255; fi
+out=""; length=""; model=""
+for argument in "$@"; do
+  case "$argument" in
+    --out-dir=*) out="${argument#--out-dir=}" ;;
+    --length=*) length="${argument#--length=}" ;;
+  esac
+  model="$argument"
+done
+name="$(basename "$model")"
+trace() {
+  directory="$out/$name/2026-10-23T00-00-00_1"
+  mkdir -p "$directory"
+  cp "$here/../../counter.violation.itf.json" "$directory/violation.itf.json"
+}
+passes() { echo "The outcome is: NoError                I@00:00:00.000"; echo "EXITCODE: OK"; exit 0; }
+violates() { trace; echo "The outcome is: Error                  I@00:00:00.000"; echo "EXITCODE: ERROR (12)"; exit 12; }
+case "$name" in
+  Passing.tla|Inductive.tla) passes ;;
+  Short.tla) echo "The outcome is: ExecutionsTooShort     I@00:00:00.000"; exit 0 ;;
+  Violating.tla|BaseFails.tla) violates ;;
+  NotInductive.tla) if [ "$length" = 0 ]; then passes; else violates; fi ;;
+  Deadlocking.tla) trace; echo "The outcome is: Deadlock               I@00:00:00.000"; exit 12 ;;
+  Rejected.tla) echo "Bad.tla:3:10-3:10: type input error: Expected a type annotation for VARIABLE n"; echo "EXITCODE: ERROR (255)"; exit 255 ;;
+  Slow.tla) exec sleep 30 ;;
+  *) echo "the stand-in knows no model named $name" >&2; exit 255 ;;
+esac

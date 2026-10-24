@@ -18,3 +18,7 @@ require «zil-lean» from git "https://github.com/jagg-ix/zil-lean.git" @ "4c5a3
 /-- Tests whose `run_cmd` blocks read the shipped library files; they run when the module is compiled. -/
 lean_exe zilLibTests where
   root := `ZilLib.Test.Main
+
+/-- Tests of the Apalache modules. Run from the repository root; `--with-tool` also starts the real tool. -/
+lean_exe zilLibApalacheTests where
+  root := `ZilLib.Test.ApalacheMain

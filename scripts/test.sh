@@ -1,26 +1,29 @@
 #!/usr/bin/env bash
 # The gate of the toolkit.
 #
-#   scripts/test.sh [--skip-build] [--full]   (--skip-build expects `lake build` to have built what --full needs)
+#   scripts/test.sh [--skip-build] [--full] [--with-tool]   (--skip-build expects `lake build` to have built what --full needs)
 #
 # 0. LICENSE is the Apache License 2.0 as apache.org publishes it (SHA-256 of LICENSE-2.0.txt);
 # 1. the pin in lakefile.lean is the commit lake-manifest.json resolved, and is a full commit id;
 # 2. a clean build needs only lake and git: the gate runs with `java`, `apalache-mc` and `clojure` shims that exit 99 first on PATH;
-# 3. the executable reads a model through the pinned core and reports what it holds.
+# 3. the executable reads a model through the pinned core and reports what it holds;
+# 4. the Apalache modules (trace reader, runner, evidence, induction) and the `zilLib apalache` commands, against a stand-in tool that
+#    starts no JVM, so the failing `java` and `apalache-mc` programs are never called.
 # With --full it also runs everything that qualifies the macro libraries in libsets/ (about ten minutes): the prefix check, the
 # model-substrate Lean tests and examples, the extension gates, the corpus, the 18-row matrix, the AWS+namespace smoke and a
-# byte-for-byte regeneration of the Transfer Family model. Tests that need Apalache are not part of this skeleton; when they
-# exist they run only with --with-tool.
+# byte-for-byte regeneration of the Transfer Family model. With --with-tool it also runs the tests that start the real Apalache
+# (found through APALACHE_HOME or PATH; skipped, and said so, when it is not there), and with --full also the Apalache section of the README.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root"
-skip_build=0; full=0
+skip_build=0; full=0; with_tool=0
 for argument in "$@"; do
   case "$argument" in
     --skip-build) skip_build=1 ;;
     --full) full=1 ;;
-    *) echo "usage: $0 [--skip-build] [--full]" >&2; exit 2 ;;
+    --with-tool) with_tool=1 ;;
+    *) echo "usage: $0 [--skip-build] [--full] [--with-tool]" >&2; exit 2 ;;
   esac
 done
 work="$(mktemp -d "${TMPDIR:-/tmp}/zil-lib.XXXXXX")"
@@ -34,6 +37,7 @@ for tool in java apalache-mc clojure clj; do
   printf '#!/bin/sh\necho "FAIL: %s was called" >&2\nexit 99\n' "$tool" >"$work/$tool"
   chmod +x "$work/$tool"
 done
+original_path="$PATH"   # the tests that start the real tool need the real java
 export PATH="$work:$PATH"
 
 # 0. the licence
@@ -50,7 +54,7 @@ else fail "the pin in lakefile.lean ($pinned) and lake-manifest.json ($resolved)
 # 2. build
 if [[ "$skip_build" -eq 0 ]]; then
   # the library gates run the core's compiler and audit and typecheck against its library: build them with the package
-  targets=(); [[ "$full" -eq 1 ]] && targets=(zilLibTests zil-lean/zil zil-lean/zilTheoremAudit zil-lean/Zil)
+  targets=(zilLibApalacheTests); [[ "$full" -eq 1 ]] && targets+=(zilLibTests zil-lean/zil zil-lean/zilTheoremAudit zil-lean/Zil)
   if lake build "${targets[@]}" >"$work/build.log" 2>&1; then pass "a build with failing java, apalache-mc and clojure shims succeeds"
   else fail "build"; tail -20 "$work/build.log" >&2; fi
 fi
@@ -63,7 +67,52 @@ set +e; lake exe zilLib summary examples/does-not-exist.zc >/dev/null 2>&1; miss
 lake exe zilLib bogus >/dev/null 2>&1; usage=$?; set -e
 [[ "$missing" -eq 2 && "$usage" -eq 2 ]] && pass "refused: a missing model, an unknown command" || fail "refusals ($missing $usage)"
 
-# 4. the libraries
+# 4. Apalache, against the stand-in tool
+if [[ "$(lake exe zilLibApalacheTests 2>&1 | tee "$work/apalache-tests.log" | tail -1)" =~ ^[0-9]+\ passed,\ 0\ failed$ ]]; then
+  pass "Apalache modules: trace reader, runner, evidence, induction ($(tail -1 "$work/apalache-tests.log"))"
+else fail "Apalache modules"; grep '^FAIL' "$work/apalache-tests.log" >&2 || tail -5 "$work/apalache-tests.log" >&2; fi
+fixtures=test/fixtures/apalache
+fake="$fixtures/fake-home"
+apalache() { APALACHE_HOME="$root/$fake" lake exe zilLib apalache "$@"; }
+exit_of() { # expected-code description command...
+  local expected="$1" description="$2"; shift 2
+  set +e; "$@" >"$work/command.out" 2>"$work/command.err"; local code=$?; set -e
+  if [[ "$code" -eq "$expected" ]]; then pass "zilLib apalache: $description (exit $code)"
+  else fail "zilLib apalache: $description (exit $code, expected $expected)"; tail -3 "$work/command.out" "$work/command.err" >&2; fi
+}
+exit_of 0 "a run with no violation" apalache check "$fixtures/fake-models/Passing.tla" --inv Inv --length 5
+exit_of 1 "a violation, with the trace printed" apalache check "$fixtures/fake-models/Violating.tla" --inv Inv --length 5
+grep -q '^State 3$' "$work/command.out" && pass "the counterexample is printed state by state" || fail "the counterexample is not printed"
+exit_of 1 "a deadlock" apalache check "$fixtures/fake-models/Deadlocking.tla" --inv Inv --length 5
+exit_of 2 "input the tool rejects" apalache check "$fixtures/fake-models/Rejected.tla" --inv Inv --length 5
+exit_of 2 "a command line without an invariant" apalache check "$fixtures/fake-models/Passing.tla"
+exit_of 4 "a run past its deadline" apalache check "$fixtures/fake-models/Slow.tla" --inv Inv --timeout 1
+exit_of 0 "an inductive invariant" apalache induct "$fixtures/fake-models/Inductive.tla" --indinit IndInit --inv IndInv
+exit_of 1 "an invariant that is not inductive" apalache induct "$fixtures/fake-models/NotInductive.tla" --indinit IndInit --inv IndInv
+exit_of 0 "a trace file is printed" lake exe zilLib apalache trace "$fixtures/counter.violation.itf.json"
+exit_of 3 "no tool: the failing apalache-mc program first on PATH does not report a version" lake exe zilLib apalache version
+exit_of 3 "no tool: nothing in APALACHE_HOME" env APALACHE_HOME=/nonexistent lake exe zilLib apalache check "$fixtures/fake-models/Passing.tla" --inv Inv
+set +e; apalache check "$fixtures/fake-models/Violating.tla" --inv Inv --length 5 --evidence "$work/evidence.json" >/dev/null 2>&1; set -e
+if python3 -I - "$work/evidence.json" <<'PY'
+import hashlib, json, sys
+envelope = json.load(open(sys.argv[1]))
+assert envelope["schema"] == "ZIL-EVIDENCE/1"
+assert envelope["authority"] == "external" and envelope["assurance"] == "externally-attested"
+assert envelope["evidence_id"].startswith("evidence:") and len(envelope["evidence_id"]) == 73
+assert envelope["output_sha256"] == "sha256:" + hashlib.sha256(envelope["payload"].encode()).hexdigest()
+assert json.loads(envelope["payload"])["verdict"] == "violation-found"
+PY
+then pass "the evidence file is a ZIL-EVIDENCE/1 envelope whose digest matches its payload (checked outside Lean)"
+else fail "the evidence file"; fi
+
+if [[ "$with_tool" -eq 1 ]]; then
+  if PATH="$original_path" lake exe zilLibApalacheTests --with-tool 2>&1 | tee "$work/apalache-real.log" | tail -1 | grep -qE '^[0-9]+ passed, 0 failed$'; then
+    if grep -q '^SKIP' "$work/apalache-real.log"; then pass "tests with the real Apalache: skipped, apalache-mc not found"
+    else pass "tests with the real Apalache ($(grep '^tool:' "$work/apalache-real.log"); $(tail -1 "$work/apalache-real.log"))"; fi
+  else fail "tests with the real Apalache"; grep '^FAIL' "$work/apalache-real.log" >&2 || tail -5 "$work/apalache-real.log" >&2; fi
+fi
+
+# 5. the libraries
 if [[ "$full" -eq 1 ]]; then
   step() { # description command...
     local description="$1"; shift
@@ -79,6 +128,9 @@ if [[ "$full" -eq 1 ]]; then
   else fail "the Transfer Family model regenerates byte for byte"; fi
   step "macro matrix: 18 rows equal their goldens, compile and typecheck" scripts/matrix.sh --skip-build
   step "README tour: every command on the page prints what the page shows" scripts/test-tour.sh --skip-build
+  if [[ "$with_tool" -eq 1 ]]; then
+    step "README tour, Apalache section: the commands start the real tool" env PATH="$original_path" scripts/test-tour.sh --skip-build --with-tool
+  fi
 fi
 
 if [[ "$failures" -eq 0 ]]; then echo "zil-lib: all checks passed"; else echo "zil-lib: $failures check(s) failed" >&2; exit 1; fi

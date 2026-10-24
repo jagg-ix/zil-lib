@@ -30,7 +30,26 @@ apalache-mc parse     [--output=ir.json]    FILE
 | 12 | an invariant is violated (`The outcome is: Error`, a trace is written) |
 | 255 | the input is wrong: a missing type annotation, a constant that is not assigned |
 
-The exit code of a deadlock and the codes for a timeout or an out-of-memory run were *not tested*.
+More cases, observed on 2026-10-23 while building the runner (`ZilLib/Apalache/Run.lean`):
+
+| Case | Exit | `The outcome is:` | Files written |
+|---|---|---|---|
+| a state without a successor (a deadlock) | 12 | `Deadlock` | `violation.itf.json` and `violation0.itf.json` |
+| the same model with `--no-deadlock` and a bound no execution reaches | 0 | `ExecutionsTooShort` | no trace |
+| a variable without a type annotation | 255 | none (`type input error: Expected a type annotation for VARIABLE n`) | none |
+| an invariant name the model does not define | 255 | none (`Operator Nope not found (used as an invariant)`) | none |
+| the model file is inside `--out-dir` | 255 | none | none |
+
+* Exit 12 does not tell a violated invariant from a deadlock; the outcome line does. The deadlock check is on by default
+  (`--no-deadlock`, default false). A check that starts from arbitrary states, such as one induction step, must switch it off.
+* `ExecutionsTooShort` is a pass whose depth is less than the one requested; the runner reports it as such.
+* The tool writes into `<out-dir>/<model file name>/<timestamp>_<id>/`, so a model that sits in the output directory collides with that
+  directory name. The runner always uses a new directory that is not the model's.
+* The directory names sort as text in time order (`2026-10-23T18-10-10_...`), which is how the runner picks the newest trace.
+* `version` prints the bare version, `0.62.4`, on one line.
+
+The code of a timeout of the tool itself and of an out-of-memory run were *not tested*; the runner's own deadline kills the tool and is
+reported as `timedOut`.
 
 ## The JSON IR (APL-10)
 

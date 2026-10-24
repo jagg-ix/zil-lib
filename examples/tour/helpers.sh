@@ -1,6 +1,7 @@
 # Helper functions for the tour. Load them from the repository root: . examples/tour/helpers.sh
 zil()   { lake env zil "$@"; }
 audit() { lake env zilTheoremAudit "$@"; }
+zillib() { lake env zilLib "$@"; }
 
 # query FILE NAME: print the result bindings of a query, one per line
 query() { zil explain-query "$1" "$2" | awk -F'\t' '$1 == "witness" {print $3}'; }

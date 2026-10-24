@@ -22,7 +22,7 @@ repository specifies. There are no other dependencies: no Java, Clojure or datab
 ```sh
 git clone https://github.com/jagg-ix/zil-lib
 cd zil-lib
-lake build ZilLib zil-lean/zil zil-lean/zilTheoremAudit zil-lean/Zil
+lake build ZilLib zilLib zil-lean/zil zil-lean/zilTheoremAudit zil-lean/Zil
 . examples/tour/helpers.sh
 ```
 
@@ -34,6 +34,7 @@ The last command loads a few shell helper functions, which are all the tooling t
 ```sh
 zil()   { lake env zil "$@"; }
 audit() { lake env zilTheoremAudit "$@"; }
+zillib() { lake env zilLib "$@"; }
 
 # query FILE NAME: print the result bindings of a query, one per line
 query() { zil explain-query "$1" "$2" | awk -F'\t' '$1 == "witness" {print $3}'; }
@@ -441,17 +442,166 @@ parameter list and a template of facts to emit (the `LEAN_PROOF` macro in questi
 of the small libraries in `libsets/` (`proof-evidence` is 21 lines) into a new directory, edit it, and run
 `zil expand FILE - --lib YOUR_DIR`.
 
+## Checking TLA+ models with Apalache
+
+[Apalache](https://apalache-mc.org) is a symbolic model checker for TLA+. The toolkit runs it, reads the counterexamples it writes, records
+each run as evidence, and checks whether an invariant is inductive. The tool is not part of this repository and is never downloaded. It is
+looked up in `$APALACHE_HOME/bin` and then on `PATH`, and it needs a Java runtime. When the tool is missing, the commands say so and exit
+with status 3. The test suite never starts it unless you pass `--with-tool`.
+
+```bash
+export APALACHE_HOME=/path/to/apalache-0.62.4    # or put apalache-mc on PATH
+```
+
+The example is an invented model of two counters that are meant to move together (`test/fixtures/apalache/LockStep.tla`). Every variable and
+constant has a type annotation in a comment, which Apalache requires:
+
+```tla
+CInit == Max = 5 /\ Fault = FALSE
+CInitFault == Max = 5 /\ Fault = TRUE
+Init == a = 0 /\ b = 0
+Next ==
+  /\ a < Max
+  /\ a' = a + 1
+  /\ b' = IF Fault THEN b + 2 ELSE b + 1
+\* True in every reachable state, but not inductive: from a = 0 and b = Max one step reaches b = Max + 1.
+Bounded == b <= Max
+\* The conjunct that is missing: the counters move together.
+InStep == a = b
+IndInv == Bounded /\ InStep
+\* The states to step from, in assignment form: each variable ranges over its type.
+WeakInit == a \in 0..Max /\ b \in 0..Max /\ Bounded
+StrongInit == a \in 0..Max /\ b \in 0..Max /\ IndInv
+```
+
+### A bounded check
+
+`check` looks for a violation in every execution of up to the given number of steps. Here the invariant `Bounded` holds for five steps:
+
+```sh
+zillib apalache check test/fixtures/apalache/LockStep.tla --cinit CInit --inv Bounded --length 5 | grep -v -e '^tool:' -e '^output:'
+```
+
+```text
+no violation of Bounded in any execution of 5 steps.
+This says nothing about longer executions, and nothing about other constants.
+```
+
+With the defect switched on (`CInitFault`), the counters drift apart at the first step, and the tool returns a counterexample:
+
+```sh
+zillib apalache check test/fixtures/apalache/LockStep.tla --cinit CInitFault --inv InStep --length 3 > /tmp/check.txt || echo "exit status $?"
+grep -v -e '^tool:' -e '^output:' /tmp/check.txt
+```
+
+```text
+exit status 1
+InStep is violated. The counterexample:
+State 0
+  Fault = TRUE
+  Max = 5
+  a = 0
+  b = 0
+State 1
+  Fault = TRUE
+  Max = 5
+  a = 1
+  b = 2
+```
+
+A pass is evidence for the stated number of steps and the stated constants. It says nothing about longer executions or other constants. By
+default the tool also reports a state without a successor as a deadlock; `--no-deadlock` turns that off.
+
+### An inductive invariant
+
+An invariant is *inductive* when every initial state satisfies it and every step from a state that satisfies it leads to a state that
+satisfies it. An inductive invariant holds in every reachable state, however long the execution. `induct` checks both cases. For the step it
+needs a predicate in assignment form that describes the states to step from: each variable ranges over its type, and the invariant holds.
+In `LockStep.tla` these are `WeakInit` and `StrongInit`.
+
+`Bounded` is true in every reachable state, but it is not inductive on its own. The tool finds a state that satisfies it and leaves it after
+one step (the counter `a` is still at 0 while `b` has already reached its maximum):
+
+```sh
+zillib apalache induct test/fixtures/apalache/LockStep.tla --cinit CInit --indinit WeakInit --inv Bounded > /tmp/weak.txt || echo "exit status $?"
+grep -v -e '^tool:' -e '^output:' /tmp/weak.txt
+```
+
+```text
+exit status 1
+Bounded: not inductive. The state below satisfies WeakInit and leaves Bounded after one step.
+A counterexample to induction is a finding, not a defect: the state may be unreachable, and the invariant may need a stronger conjunct.
+State 0
+  Fault = FALSE
+  Max = 5
+  a = 0
+  b = 5
+State 1
+  Fault = FALSE
+  Max = 5
+  a = 1
+  b = 6
+```
+
+That state may be unreachable, so a counterexample to induction is a finding and not a defect of the model. It points at the missing
+conjunct: the counters must be equal. With `InStep` added, the invariant is inductive at these constants:
+
+```sh
+zillib apalache induct test/fixtures/apalache/LockStep.tla --cinit CInit --indinit StrongInit --inv IndInv | grep -v -e '^tool:' -e '^output:'
+```
+
+```text
+IndInv: inductive at the constants that were set. Both cases passed.
+This holds for these constants only. It is not a proof for other sizes.
+```
+
+This holds for `Max = 5` only. A statement for every value of `Max` needs a proof outside the tool. With the defect switched on, the step
+fails even for the strengthened invariant, which shows that the check can fail.
+
+### Evidence
+
+`--evidence FILE` writes the run as a `ZIL-EVIDENCE/1` envelope. The producer is outside Lean, so the authority is `external` and the
+assurance is `externally-attested`. The identity of the envelope covers the model, the modules it extends, the request and the version of the
+tool, so changing any of them changes it. A run that times out is recorded as inconclusive, never as a pass, and a run that the tool rejects
+has no envelope.
+
+```sh
+zillib apalache induct test/fixtures/apalache/LockStep.tla --cinit CInit --indinit StrongInit --inv IndInv --evidence /tmp/evidence.json > /dev/null
+python3 -I -c 'import json, sys; e = json.load(open(sys.argv[1])); p = json.loads(e["payload"]); print(e["authority"], e["assurance"]); print(p["verdict"]); print(p["statement"])' /tmp/evidence.json
+```
+
+```text
+external externally-attested
+inductive-at-the-constants
+IndInv holds in every initial state and is preserved by every step from StrongInit, so it holds in every reachable state at the constants set by CInit and at no other constants
+```
+
+### Exit codes
+
+| Exit status | Meaning |
+|---|---|
+| 0 | no violation within the bound, or the invariant is inductive at the constants |
+| 1 | an invariant is violated, a state has no successor (a deadlock), or the invariant is not inductive |
+| 2 | the tool rejected the input or failed, or the command line was wrong |
+| 3 | there is no tool |
+| 4 | the deadline passed, so the result is inconclusive |
+
+`zilLib apalache trace FILE.itf.json` prints a trace file written by the tool, one state after the other.
+
 ## Repository layout
 
 | Path | What |
 |---|---|
 | `lakefile.lean` | the Lake package definition and the dependency pin: `require «zil-lean»` at one full commit |
 | `ZilLib/` | the Lean library; `Model.lean` reads a model with the core's parser |
-| `ZilLib/CLI/Main.lean` | the `zilLib` executable (`zilLib summary <model.zc>`) |
+| `ZilLib/CLI/Main.lean` | the `zilLib` executable (`zilLib summary <model.zc>`, `zilLib apalache ...`) |
 | `ZilLib/Tour.lean` | the Lean theorem used in question 4 of the tour |
+| `ZilLib/Apalache/` | running Apalache: `Itf.lean` reads its traces, `Run.lean` finds and runs it, `Evidence.lean` records a run, `Induct.lean` checks that an invariant is inductive |
+| `ZilLib/CLI/ApalacheCommands.lean` | the `zilLib apalache` commands |
 | `examples/tour/` | the four example models of the tour and the shell helper functions |
 | `scripts/test.sh` | the test suite (CI gate) |
 | `scripts/test-tour.sh` | runs every command in the tour and compares its output with this README |
+| `test/fixtures/apalache/` | traces and models the tool wrote or that were written for it, and a stand-in tool for tests that must not start a JVM |
 | `docs/targets.md` | the work list for the Apalache toolkit |
 | `docs/move-libsets.md` | the plan for moving the macro libraries here (completed) |
 

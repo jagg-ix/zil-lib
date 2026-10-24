@@ -13,9 +13,9 @@ The first plan assumed that the value of Apalache was a lowering from ZIL. A day
 2. **It is not a replacement for an explicit-state checker.** On a model with a small state space, an explicit-state checker gives a complete
    answer quickly; Apalache starts a JVM and a solver for every run (3 s for the smallest check).
 3. **It wins in two places:** domains an explicit-state checker cannot enumerate (the tool's documentation says so; it is not measured here),
-   and *induction* (also from the tool's documentation, not measured here). A counterexample to induction names the missing conjunct of an invariant in seconds, and
+   and *induction* (measured on `LockStep.tla`). A counterexample to induction names the missing conjunct of an invariant in seconds, and
    once the invariant is inductive the proof covers every depth at that domain size.
-4. **Most of the benefit needs no ZIL.** Plain TLA+ with type comments is enough for the tool. A toolkit that runs the tool, reads
+4. **Most of the benefit needs no ZIL.** `LockStep.tla` is plain TLA+ with type comments. A toolkit that runs the tool, reads
    its traces, and records the result as evidence is useful to any TLA+ model; the ZIL lowering is a second, separate benefit.
 
 So the plan has two tracks that share a runner.
@@ -40,6 +40,8 @@ Each milestone has an exit that can be shown, and a stop rule.
 
 ### M1 Runner and trace reader (APL-20, APL-21)
 
+**Done 2026-10-23.** `ZilLib/Apalache/Run.lean` and `Itf.lean`; tests in `ZilLib/Test/Apalache.lean`; `zilLib apalache check|trace|version`. The gate passes with failing `java` and `apalache-mc` programs because its tests use a stand-in tool. The exit as written below holds, with one change: the "tool unavailable" exit is 3 and a deadline that passed is 4. Running the real tool also showed facts the plan did not have (deadlock, `ExecutionsTooShort`, the output-directory collision): `docs/tool-notes.md`.
+
 - `ZilLib/Apalache/Run.lean`: find the tool (`APALACHE_HOME`, then `PATH`), record `version`, run `check` in a fresh `--out-dir` with a deadline,
   map exit codes (0, 12, 255, timeout, tool missing) to a result type, collect the newest `violation*.itf.json`.
 - `ZilLib/Apalache/Itf.lean`: read ITF into a typed trace (sets, tuples, maps, big integers, uninterpreted strings, `params`), print it.
@@ -49,6 +51,8 @@ Each milestone has an exit that can be shown, and a stop rule.
 
 ### M2 Evidence (APL-24)
 
+**Done 2026-10-23** for runs on TLA+ (`ZilLib/Apalache/Evidence.lean`). The input digest covers the model and the modules it extends, because there is no IR yet. The tests change each part of the request and compare the digest of the inputs, not only the evidence id: removing the bound from the inputs was a mutation that the first version of the tests did not catch, because the payload also names the bound.
+
 - One `ZIL-EVIDENCE/1` envelope per run: role `bounded-model-checker`, authority `external`, assurance `externally-attested`, the input hash,
   the tool version and command, the bounds (domain sizes, steps), the verdict. A *no violation* result says *within these bounds*. A
   counterexample to induction is a finding, not a failure of the model.
@@ -57,11 +61,13 @@ Each milestone has an exit that can be shown, and a stop rule.
 
 ### M3 The induction workflow (APL-41), on TLA+ input
 
+**Done 2026-10-23** (`ZilLib/Apalache/Induct.lean`, `zilLib apalache induct`), on an invented model, `test/fixtures/apalache/LockStep.tla`. The exit as written is met there: the invariant is true but not inductive on its own, the counterexample to induction shows the missing conjunct, the strengthened invariant is inductive at the constants that were set, and the injected defect is caught. **The decision point below is still open**: it needs three models other than `LockStep.tla`.
+
 - `induct` takes a model, the invariant, and the assignment form of the type predicate (`IndInit`), runs the base case (`--length=0`) and the
   step (`--length=1`), and prints either *inductive within these bounds* or the counterexample to induction.
-- **Exit:** an invariant that is true but not inductive gets a counterexample to induction that shows the missing conjunct, the strengthened
-  invariant is inductive, and an injected defect is caught by the step check.
-- **Decision point (go/no-go for Track A beyond M3):** run it on three models other than the one the check was developed on. Continue if it finds at least one
+- **Exit:** reproduces the measured result in `docs/tool-notes.md`: `Bounded` is not inductive, the counterexample shows the missing
+  conjunct, `IndInv` is inductive, and the injected defect is caught by the step check.
+- **Decision point (go/no-go for Track A beyond M3):** run it on three models other than `LockStep.tla`. Continue if it finds at least one
   non-inductive invariant whose counterexample is a useful strengthening hint, or checks a domain the explicit-state checker could not finish.
   Stop and keep M1 to M3 as a tool if it does neither.
 
