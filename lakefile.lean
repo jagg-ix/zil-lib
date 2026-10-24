@@ -26,3 +26,7 @@ lean_exe zilLibApalacheTests where
 /-- Tests of the certificate checker. Run from the repository root. -/
 lean_exe zilLibCertifyTests where
   root := `ZilLib.Test.CertifyMain
+
+/-- Tests of the SMT-LIB 2 backend (TS-03). -/
+lean_exe zilLibSmtTests where
+  root := `ZilLib.Test.SMTMain

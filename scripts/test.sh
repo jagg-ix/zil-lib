@@ -9,7 +9,8 @@
 # 3. the executable reads a model through the pinned core and reports what it holds;
 # 4. the Apalache modules (trace reader, runner, evidence, induction) and the `zilLib apalache` commands, against a stand-in tool that
 #    starts no JVM, so the failing `java` and `apalache-mc` programs are never called;
-# 5. the certificate checker and `zilLib certify`: the engine's answers checked by an independent program.
+# 5. the certificate checker and `zilLib certify`: the engine's answers checked by an independent program;
+# 6. the SMT-LIB 2 backend and `zilLib smt`: BMC, k-induction, Lean replay reference verification, and ZIL-EVIDENCE/1.
 # With --full it also runs everything that qualifies the macro libraries in libsets/ (about ten minutes): the prefix check, the
 # model-substrate Lean tests and examples, the extension gates, the corpus, the 18-row matrix, the AWS+namespace smoke and a
 # byte-for-byte regeneration of the Transfer Family model. With --with-tool it also runs the tests that start the real Apalache
@@ -55,7 +56,7 @@ else fail "the pin in lakefile.lean ($pinned) and lake-manifest.json ($resolved)
 # 2. build
 if [[ "$skip_build" -eq 0 ]]; then
   # the library gates run the core's compiler and audit and typecheck against its library: build them with the package
-  targets=(zilLibApalacheTests zilLibCertifyTests); [[ "$full" -eq 1 ]] && targets+=(zilLibTests zil-lean/zil zil-lean/zilTheoremAudit zil-lean/Zil)
+  targets=(zilLibApalacheTests zilLibCertifyTests zilLibSmtTests); [[ "$full" -eq 1 ]] && targets+=(zilLibTests zil-lean/zil zil-lean/zilTheoremAudit zil-lean/Zil)
   if lake build "${targets[@]}" >"$work/build.log" 2>&1; then pass "a build with failing java, apalache-mc and clojure shims succeeds"
   else fail "build"; tail -20 "$work/build.log" >&2; fi
 fi
@@ -176,7 +177,35 @@ printf 'MODULE m.\nzil_fact node(a) ⟶[r]\n' >"$work/broken-lines.zc"
 exit_of 2 "certify: a zil_fact line in another shape is refused" lake exe zilLib certify "$work/broken-lines.zc"
 grep -q 'line 2:' "$work/command.err" && pass "certify: the refusal names the line" || fail "certify: the refusal does not name the line"
 
-# 6. the libraries
+# 6. SMT-LIB 2 backend (TS-03)
+if [[ "$(lake exe zilLibSmtTests 2>&1 | tee "$work/smt-tests.log" | tail -1)" =~ ^[0-9]+\ passed,\ 0\ failed$ ]]; then
+  pass "SMT-LIB 2 backend: BMC, k-induction, model parser, replay validation, Z3 runner ($(tail -1 "$work/smt-tests.log"))"
+else fail "SMT-LIB 2 backend"; grep '^FAIL' "$work/smt-tests.log" >&2 || tail -5 "$work/smt-tests.log" >&2; fi
+
+exit_of 0 "zilLib smt: version reports solver" lake exe zilLib smt version
+exit_of 0 "zilLib smt: BMC on passing Counter" lake exe zilLib smt check Counter --inv x_nonneg --length 5
+exit_of 1 "zilLib smt: BMC on defective Counter finds violation" lake exe zilLib smt check CounterDefective --inv x_lt_3 --length 5
+grep -q '^State 3$' "$work/command.out" && pass "zilLib smt: counterexample printed state by state" || fail "zilLib smt: counterexample not printed"
+exit_of 0 "zilLib smt: k-induction on Counter" lake exe zilLib smt induct Counter --inv x_nonneg --step 1
+exit_of 1 "zilLib smt: k-induction on non-inductive invariant" lake exe zilLib smt induct CounterDefective --inv x_lt_3 --step 1
+exit_of 2 "zilLib smt: command line without an invariant" lake exe zilLib smt check Counter --length 5
+exit_of 2 "zilLib smt: unknown module" lake exe zilLib smt check Nonexistent --inv x_nonneg
+exit_of 2 "zilLib smt: unknown invariant" lake exe zilLib smt check Counter --inv nonexistent
+set +e; lake exe zilLib smt check CounterDefective --inv x_lt_3 --length 5 --evidence "$work/smt-evidence.json" >/dev/null 2>&1; set -e
+if python3 -I - "$work/smt-evidence.json" <<'PY'
+import hashlib, json, sys
+envelope = json.load(open(sys.argv[1]))
+assert envelope["schema"] == "ZIL-EVIDENCE/1"
+assert envelope["authority"] == "external" and envelope["assurance"] == "externally-attested"
+assert envelope["role"] == "bounded-model-checker"
+assert envelope["evidence_id"].startswith("evidence:") and len(envelope["evidence_id"]) == 73
+assert envelope["output_sha256"] == "sha256:" + hashlib.sha256(envelope["payload"].encode()).hexdigest()
+assert json.loads(envelope["payload"])["verdict"] == "violation-found"
+PY
+then pass "zilLib smt: the evidence file is a valid ZIL-EVIDENCE/1 envelope"
+else fail "zilLib smt: the evidence file failed verification"; fi
+
+# 7. the libraries
 if [[ "$full" -eq 1 ]]; then
   step() { # description command...
     local description="$1"; shift

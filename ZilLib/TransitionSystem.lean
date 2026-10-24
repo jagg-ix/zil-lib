@@ -457,6 +457,25 @@ def counterModule : TSModule := {
   invariants := [("x_nonneg", .ge (.var "x" false) (.constInt 0))]
 }
 
+/-- Defective counter specification that fails invariant `x < 3` at step 3. -/
+def counterDefectiveModule : TSModule := {
+  name := "CounterDefective"
+  variables := [{ name := "x", sort := .int }]
+  init := .eq (.var "x" false) (.constInt 0)
+  next := .eq (.var "x" true) (.add (.var "x" false) (.constInt 1))
+  invariants := [("x_lt_3", .lt (.var "x" false) (.constInt 3))]
+}
+
+/-- LockStep specification: two synchronized counters x and y, invariant `x = y`. -/
+def lockStepModule : TSModule := {
+  name := "LockStep"
+  variables := [{ name := "x", sort := .int }, { name := "y", sort := .int }]
+  init := .and (.eq (.var "x" false) (.constInt 0)) (.eq (.var "y" false) (.constInt 0))
+  next := .and (.eq (.var "x" true) (.add (.var "x" false) (.constInt 1)))
+               (.eq (.var "y" true) (.add (.var "y" false) (.constInt 1)))
+  invariants := [("x_eq_y", .eq (.var "x" false) (.var "y" false))]
+}
+
 /-- Direct mathematical transition system for `Counter` over integer state for adequacy reference. -/
 @[reducible]
 def CounterTS : TransitionSystem Int where
