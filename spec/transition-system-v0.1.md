@@ -1,6 +1,6 @@
 # Transition System Representation & SMT Backend Contract v0.1
 
-This contract specifies the semantic transition-system layer in `zil-lib` (`TSModule` deep embedding and `TransitionSystem` semantic class in Lean 4), the safety fragment, front-end TLA+ ingest via snapshots, solver backends (PySMT and Apalache), the assurance contract, and the unified lowering target for ZIL programs.
+This contract specifies the semantic transition-system layer in `zil-lib` (`TSModule` deep embedding and `TransitionSystem` semantic class in Lean 4), the safety fragment, front-end TLA+ ingest via snapshots, solver backends (SMT-LIB 2 / Z3 and Apalache), the assurance contract, and the unified lowering target for ZIL programs.
 
 It corresponds to target `TS-00` in `docs/targets.md` (Batch S) and establishes the architectural foundation for targets `TS-01` through `TS-05`.
 
@@ -11,13 +11,13 @@ It corresponds to target `TS-00` in `docs/targets.md` (Batch S) and establishes 
 1. **Lean is the Semantic Authority:**
    A specification—whether imported from TLA+ source or lowered from a ZIL program—becomes a first-class value in Lean 4. Its formal mathematical meaning is defined by Lean denotation semantics. Safety proofs conducted in Lean are verified by the Lean 4 kernel.
 2. **Interchangeable Backends from One Representation:**
-   External verification tools (PySMT with SMT solvers, and Apalache with SMT-based symbolic model checking) are independent backends consuming the same semantic model. Neither backend dictates the internal language of the toolkit.
+   External verification tools (Z3 via SMT-LIB 2, and Apalache with SMT-based symbolic model checking) are independent backends consuming the same semantic model. Neither backend dictates the internal language of the toolkit.
 3. **Dual-Layer Representation:**
    Mathematical functions (`State → State → Prop`) cannot be printed for external solvers. Therefore, the architecture cleanly separates a **deep embedding** (`TSModule` AST) read by backends from a **denotational class** (`TransitionSystem`) giving the mathematical meaning in Lean.
 4. **Zero External Tools in Core Build:**
-   A clean clone of `zil-lib` builds and tests using only `lake` and `git`. No Java runtime, Clojure, Python interpreter, SMT solver, or SANY binary is required by `lake build` or `scripts/test.sh`. External tools are invoked only when `--with-tool` is passed and are gracefully skipped when absent.
+   A clean clone of `zil-lib` builds and tests using only `lake` and `git`. No Java runtime, Clojure, external SMT solver, or SANY binary is required by `lake build` or `scripts/test.sh`. External tools are invoked only when `--with-tool` is passed and are gracefully skipped when absent.
 5. **Trace Replay Before Reporting:**
-   No external solver counterexample is ever accepted on faith. Any counterexample trace returned by PySMT or Apalache must be replayed and confirmed by Lean's reference evaluator before a violation is reported.
+   No external solver counterexample is ever accepted on faith. Any counterexample trace returned by Z3 or Apalache must be replayed and confirmed by Lean's reference evaluator before a violation is reported.
 
 ---
 
@@ -39,11 +39,12 @@ It corresponds to target `TS-00` in `docs/targets.md` (Batch S) and establishes 
                          ▼               ▼
       ┌──────────────────────┐   ┌─────────────────────────────┐
       │ TransitionSystem     │   │ Backends:                   │
-      │   class in Lean 4    │   │ 1. PySMT (BMC, k-induction) │
-      │   State : Type       │   │ 2. SMT-LIB 2 (Z3/cvc5)      │
-      │   Init : State → Prop│   │ 3. Apalache (Typed JSON IR) │
-      │   Next : State → ... │   └──────────────┬──────────────┘
-      └──────────┬───────────┘                  │
+      │   class in Lean 4    │   │ 1. SMT-LIB 2 & Z3           │
+      │   State : Type       │   │    (BMC, k-induction)       │
+      │   Init : State → Prop│   │ 2. Apalache                 │
+      │   Next : State → ... │   │    (Typed JSON IR)          │
+      └──────────┬───────────┘   └──────────────┬──────────────┘
+                 │                              │
                  │                              │ counterexample
                  │                              │ trace
                  ▼                              ▼
@@ -206,23 +207,35 @@ A core constraint of `zil-lib` is that building the repository or running `scrip
 
 ---
 
-## 5. Solver Backends: PySMT and Apalache
+## 5. Solver Backends: SMT-LIB 2 (Z3) and Apalache
 
-### 5.1 PySMT Backend (TS-03)
-From a `TSModule`, the PySMT backend translates the model into:
-1. **SMT-LIB 2 Output (`.smt2`):**
+### 5.1 SMT-LIB 2 & Z3 Backend (TS-03)
+From a `TSModule`, the SMT backend translates the transition system directly into standard SMT-LIB 2 text (`.smt2`) using pure functional formatting in Lean (`ZilLib/Smt/SmtLib.lean`), completely eliminating intermediate runtime dependencies or wrappers.
+
+1. **Pure Lean SMT-LIB 2 Generation (`.smt2`):**
    - Declares sorts and state variables for each step $i \in \{0, \dots, k\}$.
-   - Asserts initial condition at step 0: $Init(s_0)$.
-   - Asserts transition relation for steps $0 \le i < k$: $Next(s_i, s_{i+1})$.
-   - Asserts violation of invariant at step $k$: $\neg Inv(s_k)$.
-2. **Python PySMT Script (`.py`):**
-   - Uses PySMT symbols (`Symbol(f"{var}@{i}", INT)` or `BOOL`).
-   - Solves via solver API (`Solver(name="z3")`).
-   - Extracts concrete valuations for all state variables at steps $0 \dots k$ if satisfiable.
+   - Maps sorts cleanly to standard SMT-LIB 2 theories: `Bool` $\to$ `Bool`, `Int` $\to$ `Int`, and finite enumerations $\to$ indexed integers with range constraints or `declare-datatype`.
+   - Encodes initial condition at step 0: `(assert (Init_0 ...))`.
+   - Encodes transition relation for steps $0 \le i < k$: `(assert (Next_i ...))`.
+   - Encodes violation of invariant at step $k$: `(assert (not (Inv_k ...)))`.
+   - Uses standard SMT-LIB logic: `QF_LIA` (quantifier-free linear integer arithmetic) or `ALL`.
+
+2. **Native Z3 Execution & S-Expression Parsing:**
+   - Command: `z3 -smt2 <spec.smt2>` (with configurable timeout).
+   - If satisfiable (`sat`), Z3 is queried with `(get-model)`.
+   - Lean parses the resulting S-expression model directly (`ZilLib/Smt/ModelParser.lean`):
+     - Extracts valuations for each state variable `var_i` at step $i$.
+     - Reconstructs a candidate trace $[s_0, s_1, \dots, s_k]$.
+   - If unsatisfiable (`unsat`), the bounded invariant holds up to step $k$.
+
 3. **k-Induction Mode:**
-   - **Base case:** Checks reachability of a violation in $0 \dots k$ steps.
-   - **Inductive step:** Asserts $Inv(s_0) \land \dots \land Inv(s_{k-1}) \land Next(s_0, s_1) \land \dots \land Next(s_{k-1}, s_k) \land \neg Inv(s_k)$.
-   - A counterexample to induction is reported as *candidate invariant is not inductive at depth k*, not as a system fault.
+   - **Base case:** Checks reachability of an invariant violation in $0 \le i \le k$ steps:
+     $$Init(s_0) \land \bigwedge_{i=0}^{j-1} Next(s_i, s_{i+1}) \land \neg Inv(s_j)$$
+   - **Inductive step:** Asserts invariant on $k$ consecutive states and checks if the next state can violate it:
+     $$\bigwedge_{i=0}^{k-1} Inv(s_i) \land \bigwedge_{i=0}^{k-1} Next(s_i, s_{i+1}) \land \neg Inv(s_k)$$
+   - If base case is `sat`, a counterexample trace is extracted and forwarded to Lean replay.
+   - If inductive step is `sat`, a counterexample to induction is reported: *candidate invariant is not inductive at depth k* (a 1-step or k-step transition from an unreachable state violates the invariant; strengthening is required).
+   - If both base case and step are `unsat`, the invariant is proven inductive at depth $k$ (`inductive-proved`).
 
 ### 5.2 Apalache Backend (TS-04 / APL-10)
 From a `TSModule`, the Apalache backend emits:
@@ -231,7 +244,7 @@ From a `TSModule`, the Apalache backend emits:
 
 ### 5.3 Differential Oracle (TS-04)
 On any model (such as `Counter`, `LockStep`, `TwoProcLock`, `TokenArbiter`, `RingBuffer`):
-- PySMT and Apalache are executed independently.
+- Z3 (via pure SMT-LIB 2) and Apalache are executed independently.
 - Both must agree on the verdict (no violation within bound $k$, or violation found at step $k$).
 - Any discrepancy is flagged as an engine defect with both solver traces retained for review.
 
@@ -240,7 +253,7 @@ On any model (such as `Counter`, `LockStep`, `TwoProcLock`, `TokenArbiter`, `Rin
 ## 6. Assurance Rules & Witness Replay
 
 1. **Replay Mandatory:**
-   A violation reported by an SMT solver (PySMT/Z3) or Apalache is only a *candidate counterexample*. It is never presented to the user until verified by Lean.
+   A violation reported by an external solver (Z3 via SMT-LIB 2, or Apalache) is only a *candidate counterexample*. It is never presented to the user until verified by Lean.
 2. **Lean Reference Evaluator:**
    The candidate trace $[s_0, s_1, \dots, s_k]$ is supplied to `TS.replayTrace`:
    - Checks that $evalInit(m, s_0) = true$.
@@ -250,21 +263,23 @@ On any model (such as `Counter`, `LockStep`, `TwoProcLock`, `TokenArbiter`, `Rin
    - If Lean replay **confirms** the trace: Verdict is `violation-found` with assurance level `externally-attested` (or `validated`).
    - If Lean replay **rejects** the trace: Verdict is `backend-defect` with the invalid transition logged. The external solver's answer is suppressed.
 4. **Evidence Envelope:**
-   Results are emitted in a `ZIL-EVIDENCE/1` envelope containing the SHA-256 of the `TSModule`, the solver versions, the bounds, and the replay status.
+   Results are emitted in a `ZIL-EVIDENCE/1` envelope containing the SHA-256 of the `TSModule`, the solver versions (e.g. `z3 --version`), the bounds, and the replay status.
 
 ---
 
-## 7. Build and Python Toolchain Policy
+## 7. Build and External Toolchain Policy
 
-1. **Isolation of Python Environment:**
-   - PySMT and SMT solver bindings are maintained in a dedicated, isolated virtual environment:
-     `$HOME/lab/zil-jade/pysmt-venv`
-   - Versions of Python, PySMT, and Z3 bindings are pinned and recorded in `docs/tool-notes.md`.
-   - No Python packages are vendored into the git repository.
-2. **Test Gate Policy:**
-   - Pure tests (AST construction, `denote`, Lean inductive proofs, trace replay on fixtures, SMT-LIB 2 string emission) run unconditionally in `scripts/test.sh`.
-   - Tests that execute Python/PySMT or Apalache run only when `--with-tool` is supplied.
-   - In the default gate, PATH includes failing shims for `python3`, `java`, `z3`, and `apalache-mc` that exit 99.
+1. **Zero External Dependencies in Default Build:**
+   - No Python runtime, virtual environment, or external library is required anywhere in `zil-lib`.
+   - Direct SMT-LIB 2 script generation is implemented purely in Lean (`ZilLib/Smt/SmtLib.lean`).
+   - S-expression model parsing is implemented purely in Lean (`ZilLib/Smt/ModelParser.lean`).
+2. **External Solver Execution:**
+   - When solver execution is requested (e.g. `zilLib check --backend smt --with-tool`), the CLI invokes the native `z3` binary (e.g. `/usr/local/bin/z3` or via PATH).
+   - The exact solver version is recorded in evidence envelopes (`ZIL-EVIDENCE/1`).
+3. **Test Gate Policy:**
+   - Pure tests (AST construction, `denote`, Lean inductive proofs, trace replay on fixtures, pure SMT-LIB 2 emission, and model parsing) run unconditionally in `scripts/test.sh`.
+   - Tests that execute `z3` or `apalache-mc` run only when `--with-tool` is supplied.
+   - In the default gate, PATH includes failing shims for `java`, `z3`, and `apalache-mc` that exit 99.
 
 ---
 
