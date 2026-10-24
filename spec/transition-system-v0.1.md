@@ -237,6 +237,11 @@ From a `TSModule`, the SMT backend translates the transition system directly int
    - If inductive step is `sat`, a counterexample to induction is reported: *candidate invariant is not inductive at depth k* (a 1-step or k-step transition from an unreachable state violates the invariant; strengthening is required).
    - If both base case and step are `unsat`, the invariant is proven inductive at depth $k$ (`inductive-proved`).
 
+4. **Findings from the Z3 Prototype:**
+   A prototype verified against the installed `z3` executable demonstrated that BMC to depth 3 and 1-induction on `Counter` execute in ~30 ms (compared to ~5 s JVM startup time for Apalache). The query structure uses scoped `(push 1)` and `(pop 1)` contexts over step variables ($x@0, x@1, \dots$):
+   - For bounded reachability, individual invariant violation checks are pushed and popped, querying valuations with `(get-value (x@0 ... x@k))` upon `sat`.
+   - For induction, the base check ($Init_0 \land \neg Inv_0$) and step check ($Inv_0 \land Next_{0,1} \land \neg Inv_1$) are evaluated separately. For a true but non-inductive candidate invariant (e.g. $x \le 5$ on `Counter`), Z3 immediately emits a counterexample to induction (e.g. $x@0 = 5, x@1 = 6$) via `(get-value (x@0 x@1))`.
+
 ### 5.2 Apalache Backend (TS-04 / APL-10)
 From a `TSModule`, the Apalache backend emits:
 - Typed JSON IR adhering to ADR-005 and ADR-002 (`ZilLib/Apalache/IR.lean`).
