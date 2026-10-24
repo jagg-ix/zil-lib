@@ -8,7 +8,8 @@
 # 2. a clean build needs only lake and git: the gate runs with `java`, `apalache-mc` and `clojure` shims that exit 99 first on PATH;
 # 3. the executable reads a model through the pinned core and reports what it holds;
 # 4. the Apalache modules (trace reader, runner, evidence, induction) and the `zilLib apalache` commands, against a stand-in tool that
-#    starts no JVM, so the failing `java` and `apalache-mc` programs are never called.
+#    starts no JVM, so the failing `java` and `apalache-mc` programs are never called;
+# 5. the certificate checker and `zilLib certify`: the engine's answers checked by an independent program.
 # With --full it also runs everything that qualifies the macro libraries in libsets/ (about ten minutes): the prefix check, the
 # model-substrate Lean tests and examples, the extension gates, the corpus, the 18-row matrix, the AWS+namespace smoke and a
 # byte-for-byte regeneration of the Transfer Family model. With --with-tool it also runs the tests that start the real Apalache
@@ -54,7 +55,7 @@ else fail "the pin in lakefile.lean ($pinned) and lake-manifest.json ($resolved)
 # 2. build
 if [[ "$skip_build" -eq 0 ]]; then
   # the library gates run the core's compiler and audit and typecheck against its library: build them with the package
-  targets=(zilLibApalacheTests); [[ "$full" -eq 1 ]] && targets+=(zilLibTests zil-lean/zil zil-lean/zilTheoremAudit zil-lean/Zil)
+  targets=(zilLibApalacheTests zilLibCertifyTests); [[ "$full" -eq 1 ]] && targets+=(zilLibTests zil-lean/zil zil-lean/zilTheoremAudit zil-lean/Zil)
   if lake build "${targets[@]}" >"$work/build.log" 2>&1; then pass "a build with failing java, apalache-mc and clojure shims succeeds"
   else fail "build"; tail -20 "$work/build.log" >&2; fi
 fi
@@ -77,21 +78,21 @@ apalache() { APALACHE_HOME="$root/$fake" lake exe zilLib apalache "$@"; }
 exit_of() { # expected-code description command...
   local expected="$1" description="$2"; shift 2
   set +e; "$@" >"$work/command.out" 2>"$work/command.err"; local code=$?; set -e
-  if [[ "$code" -eq "$expected" ]]; then pass "zilLib apalache: $description (exit $code)"
-  else fail "zilLib apalache: $description (exit $code, expected $expected)"; tail -3 "$work/command.out" "$work/command.err" >&2; fi
+  if [[ "$code" -eq "$expected" ]]; then pass "$description (exit $code)"
+  else fail "$description (exit $code, expected $expected)"; tail -3 "$work/command.out" "$work/command.err" >&2; fi
 }
-exit_of 0 "a run with no violation" apalache check "$fixtures/fake-models/Passing.tla" --inv Inv --length 5
-exit_of 1 "a violation, with the trace printed" apalache check "$fixtures/fake-models/Violating.tla" --inv Inv --length 5
+exit_of 0 "zilLib apalache: a run with no violation" apalache check "$fixtures/fake-models/Passing.tla" --inv Inv --length 5
+exit_of 1 "zilLib apalache: a violation, with the trace printed" apalache check "$fixtures/fake-models/Violating.tla" --inv Inv --length 5
 grep -q '^State 3$' "$work/command.out" && pass "the counterexample is printed state by state" || fail "the counterexample is not printed"
-exit_of 1 "a deadlock" apalache check "$fixtures/fake-models/Deadlocking.tla" --inv Inv --length 5
-exit_of 2 "input the tool rejects" apalache check "$fixtures/fake-models/Rejected.tla" --inv Inv --length 5
-exit_of 2 "a command line without an invariant" apalache check "$fixtures/fake-models/Passing.tla"
-exit_of 4 "a run past its deadline" apalache check "$fixtures/fake-models/Slow.tla" --inv Inv --timeout 1
-exit_of 0 "an inductive invariant" apalache induct "$fixtures/fake-models/Inductive.tla" --indinit IndInit --inv IndInv
-exit_of 1 "an invariant that is not inductive" apalache induct "$fixtures/fake-models/NotInductive.tla" --indinit IndInit --inv IndInv
-exit_of 0 "a trace file is printed" lake exe zilLib apalache trace "$fixtures/counter.violation.itf.json"
-exit_of 3 "no tool: the failing apalache-mc program first on PATH does not report a version" lake exe zilLib apalache version
-exit_of 3 "no tool: nothing in APALACHE_HOME" env APALACHE_HOME=/nonexistent lake exe zilLib apalache check "$fixtures/fake-models/Passing.tla" --inv Inv
+exit_of 1 "zilLib apalache: a deadlock" apalache check "$fixtures/fake-models/Deadlocking.tla" --inv Inv --length 5
+exit_of 2 "zilLib apalache: input the tool rejects" apalache check "$fixtures/fake-models/Rejected.tla" --inv Inv --length 5
+exit_of 2 "zilLib apalache: a command line without an invariant" apalache check "$fixtures/fake-models/Passing.tla"
+exit_of 4 "zilLib apalache: a run past its deadline" apalache check "$fixtures/fake-models/Slow.tla" --inv Inv --timeout 1
+exit_of 0 "zilLib apalache: an inductive invariant" apalache induct "$fixtures/fake-models/Inductive.tla" --indinit IndInit --inv IndInv
+exit_of 1 "zilLib apalache: an invariant that is not inductive" apalache induct "$fixtures/fake-models/NotInductive.tla" --indinit IndInit --inv IndInv
+exit_of 0 "zilLib apalache: a trace file is printed" lake exe zilLib apalache trace "$fixtures/counter.violation.itf.json"
+exit_of 3 "zilLib apalache: no tool: the failing apalache-mc program first on PATH does not report a version" lake exe zilLib apalache version
+exit_of 3 "zilLib apalache: no tool: nothing in APALACHE_HOME" env APALACHE_HOME=/nonexistent lake exe zilLib apalache check "$fixtures/fake-models/Passing.tla" --inv Inv
 set +e; apalache check "$fixtures/fake-models/Violating.tla" --inv Inv --length 5 --evidence "$work/evidence.json" >/dev/null 2>&1; set -e
 if python3 -I - "$work/evidence.json" <<'PY'
 import hashlib, json, sys
@@ -112,7 +113,21 @@ if [[ "$with_tool" -eq 1 ]]; then
   else fail "tests with the real Apalache"; grep '^FAIL' "$work/apalache-real.log" >&2 || tail -5 "$work/apalache-real.log" >&2; fi
 fi
 
-# 5. the libraries
+# 5. the certificate checker (docs/certifying-datalog.md)
+if [[ "$(lake exe zilLibCertifyTests 2>&1 | tee "$work/certify-tests.log" | tail -1)" =~ ^[0-9]+\ passed,\ 0\ failed$ ]]; then
+  pass "certificate checker: soundness, closure, stratification, faults, the engine's fixpoint ($(tail -1 "$work/certify-tests.log"))"
+else fail "certificate checker"; grep '^FAIL' "$work/certify-tests.log" >&2 || tail -5 "$work/certify-tests.log" >&2; fi
+{ echo "MODULE chain."; for i in $(seq 0 69); do echo "n:n$i#next@n:n$((i + 1))."; done; cat examples/certify/reaches-rules.zc; } >"$work/chain.zc"
+exit_of 0 "certify: the engine's trace of the shop model is certified" lake exe zilLib certify examples/tour/01-blast-radius.zc
+exit_of 1 "certify: a chain longer than the engine's 64 rounds is not closed" lake exe zilLib certify "$work/chain.zc"
+grep -q 'not-closed.*n66' "$work/command.out" && pass "certify: the missing fact is named" || fail "certify: the missing fact is not named"
+exit_of 0 "certify: the same chain with enough rounds is certified" lake exe zilLib certify "$work/chain.zc" --fuel 200
+exit_of 2 "certify: a model that does not exist" lake exe zilLib certify "$work/absent.zc"
+exit_of 2 "certify: a command line without a model" lake exe zilLib certify
+printf 'fact\t0\t0\trel\tnode:a\tr\tnode:b\t\n' >"$work/broken-trace.txt"
+exit_of 2 "certify: a report that cannot be read" lake exe zilLib certify examples/tour/01-blast-radius.zc "$work/broken-trace.txt"
+
+# 6. the libraries
 if [[ "$full" -eq 1 ]]; then
   step() { # description command...
     local description="$1"; shift

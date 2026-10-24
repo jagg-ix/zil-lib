@@ -22,3 +22,7 @@ lean_exe zilLibTests where
 /-- Tests of the Apalache modules. Run from the repository root; `--with-tool` also starts the real tool. -/
 lean_exe zilLibApalacheTests where
   root := `ZilLib.Test.ApalacheMain
+
+/-- Tests of the certificate checker. Run from the repository root. -/
+lean_exe zilLibCertifyTests where
+  root := `ZilLib.Test.CertifyMain

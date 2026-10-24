@@ -1,0 +1,8 @@
+// Reachability along a chain: the facts are written elsewhere, as n:n0#next@n:n1. and so on.
+RULE base:
+IF ?a#next@?b
+THEN ?a#reaches@?b.
+
+RULE step:
+IF ?a#reaches@?b AND ?b#next@?c
+THEN ?a#reaches@?c.

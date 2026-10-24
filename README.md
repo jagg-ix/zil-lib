@@ -588,16 +588,128 @@ IndInv holds in every initial state and is preserved by every step from StrongIn
 
 `zilLib apalache trace FILE.itf.json` prints a trace file written by the tool, one state after the other.
 
+## Certifying the engine's answers
+
+The engine computes the closure of a model: every fact that follows from its facts and rules. If it has a bug, such as a rule applied
+wrongly or a loop that stops too early, the answer is wrong and nothing says so. A *certificate checker* is a second, small program that
+checks an answer without repeating the computation. This one follows Tantow, Gerlach, Mennicke and Krötzsch, "Verifying Datalog Reasoning
+with Lean" (ITP 2025), who check Datalog proofs with a checker written in Lean.
+
+A certificate is a list of facts, each with a reason: it is a fact of the model, or a rule derived it from facts earlier in the list. The
+engine's provenance (`zil trace`) already has this form, so `zilLib certify` takes the engine's own trace of a model, or a trace report from
+a file, and checks two things:
+
+1. **Soundness.** Every fact has a valid reason. The premises of a fact come earlier in the list, so there is no circular argument, and the
+   negated conditions of a rule are absent from the list.
+2. **Closure.** Nothing is missing. No rule applied to facts in the list derives a fact that is not in the list, and every fact of the model
+   is in the list.
+
+If both hold, the facts in the list are exactly the facts that the model entails. The paper proves its checker correct in Lean for rules
+without negation, and names negation as future work. This checker also handles ZIL's stratified negation, by the argument in
+`docs/certifying-datalog.md`. It is tested, including by injecting faults, but it is not yet verified in Lean.
+
+The shop model from the tour is certified:
+
+```sh
+zillib certify examples/tour/01-blast-radius.zc
+```
+
+```text
+certificate: 31 facts, 9 from the database and 22 derived
+closure check: 22 rule instances examined
+certified: every fact is justified, and no rule derives a fact that is missing, so the facts are exactly those the program entails.
+This is the result of a checker that is tested but not yet verified in Lean (docs/certifying-datalog.md, CERT-10).
+```
+
+### A finding: the engine stops early on a long chain
+
+The engine applies the rules in rounds and stops after 64 rounds for each stratum, without saying so. A rule that follows a chain one step per
+round therefore misses everything beyond 64 steps. The facts are a chain of 70 edges and two rules that follow it:
+
+```zil
+// Reachability along a chain: the facts are written elsewhere, as n:n0#next@n:n1. and so on.
+RULE base:
+IF ?a#next@?b
+THEN ?a#reaches@?b.
+
+RULE step:
+IF ?a#reaches@?b AND ?b#next@?c
+THEN ?a#reaches@?c.
+```
+
+```sh
+{ echo "MODULE chain."; for i in $(seq 0 69); do echo "n:n$i#next@n:n$((i + 1))."; done; cat examples/certify/reaches-rules.zc; } > /tmp/chain.zc
+zillib certify /tmp/chain.zc > /tmp/certify.txt || echo "exit status $?"
+cat /tmp/certify.txt
+```
+
+```text
+exit status 1
+certificate: 2540 facts, 70 from the database and 2470 derived
+closure check: 2475 rule instances examined
+NOT certified: 5 problem(s)
+  [not-closed] rule step derives n.n0#zil.reaches@n.n66, which is not in the certificate
+  [not-closed] rule step derives n.n1#zil.reaches@n.n67, which is not in the certificate
+  [not-closed] rule step derives n.n2#zil.reaches@n.n68, which is not in the certificate
+  [not-closed] rule step derives n.n3#zil.reaches@n.n69, which is not in the certificate
+  [not-closed] rule step derives n.n4#zil.reaches@n.n70, which is not in the certificate
+```
+
+Of the 2555 facts that follow from the model, the engine derived 2540. The 15 it dropped are the pairs more than 65 steps apart, and the
+queries of `zil query-ci` leave them out as well. The checker finds the first rule instance whose head is missing, and the others follow. With
+enough rounds the same model is certified:
+
+```sh
+zillib certify /tmp/chain.zc --fuel 200 | head -3
+```
+
+```text
+certificate: 2555 facts, 70 from the database and 2485 derived
+closure check: 2485 rule instances examined
+certified: every fact is justified, and no rule derives a fact that is missing, so the facts are exactly those the program entails.
+```
+
+### A certificate from a file
+
+A report does not have to come from the engine that is being checked. The checker reads the `ZIL-PROVENANCE/1` rows that `zil trace` writes and
+trusts nothing in them. Here the last fact is deleted from the report, as a faulty or dishonest producer might leave it out:
+
+```sh
+zil trace examples/tour/01-blast-radius.zc /tmp/trace.txt > /dev/null
+awk -F'\t' '!($2 == 30 && ($1 == "fact" || $1 == "origin"))' /tmp/trace.txt > /tmp/short.txt
+zillib certify examples/tour/01-blast-radius.zc /tmp/short.txt > /tmp/short-report.txt || echo "exit status $?"
+cat /tmp/short-report.txt
+```
+
+```text
+exit status 1
+certificate: 30 facts, 9 from the database and 21 derived
+closure check: 22 rule instances examined
+NOT certified: 1 problem(s)
+  [not-closed] rule single_point derives journey.buy#zil.singlePointOfFailure@service.card_gateway, which is not in the certificate
+```
+
+### What a certificate does and does not say
+
+* It says that, for this model, the list of facts is complete and every fact in it has a valid derivation. A query answer that is a fact in
+  the list is justified, and one that is not in the list is correctly absent.
+* It does not say that the model means what you intended, and it trusts the parser, which decides what the facts and rules are.
+* It is not a proof about the checker. The paper's checker is verified in Lean; this one is tested (`lake exe zilLibCertifyTests`) and
+  `docs/certifying-datalog.md` lists the proof as a target.
+
 ## Repository layout
 
 | Path | What |
 |---|---|
 | `lakefile.lean` | the Lake package definition and the dependency pin: `require «zil-lean»` at one full commit |
 | `ZilLib/` | the Lean library; `Model.lean` reads a model with the core's parser |
-| `ZilLib/CLI/Main.lean` | the `zilLib` executable (`zilLib summary <model.zc>`, `zilLib apalache ...`) |
+| `ZilLib/CLI/Main.lean` | the `zilLib` executable (`zilLib summary <model.zc>`, `zilLib apalache ...`, `zilLib certify ...`) |
 | `ZilLib/Tour.lean` | the Lean theorem used in question 4 of the tour |
 | `ZilLib/Apalache/` | running Apalache: `Itf.lean` reads its traces, `Run.lean` finds and runs it, `Evidence.lean` records a run, `Induct.lean` checks that an invariant is inductive |
 | `ZilLib/CLI/ApalacheCommands.lean` | the `zilLib apalache` commands |
+| `ZilLib/Certify/` | the certificate checker: `Check.lean` (soundness, closure, stratification) and `Text.lean` (reads a provenance report) |
+| `ZilLib/CLI/CertifyCommands.lean` | the `zilLib certify` command |
+| `examples/certify/` | the rules of the chain example |
 | `examples/tour/` | the four example models of the tour and the shell helper functions |
 | `scripts/test.sh` | the test suite (CI gate) |
 | `scripts/test-tour.sh` | runs every command in the tour and compares its output with this README |

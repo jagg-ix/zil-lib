@@ -3,8 +3,9 @@
 
     python3 -I scripts/readme_tour.py [--show] [--with-tool]
 
-Two sections are read:
+Three sections are read:
   * "## A tour" up to "## Writing your own library", always;
+  * "## Certifying the engine's answers" up to the next "## " heading, always;
   * "## Checking TLA+ models with Apalache" up to the next "## " heading, only with --with-tool, because its commands start the real
     tool (found through APALACHE_HOME or PATH; without it the section is skipped and the run says so).
 In both:
@@ -23,7 +24,7 @@ with_tool = "--with-tool" in sys.argv
 readme = (root / "README.md").read_text()
 sources = {p: p.read_text() for p in [*root.glob("examples/tour/*.zc"), root / "ZilLib/Tour.lean",
                                        root / "libsets/proof-evidence/proof-evidence-macros.zc",
-                                       *root.glob("test/fixtures/apalache/*.tla")]}
+                                       *root.glob("test/fixtures/apalache/*.tla"), *root.glob("examples/certify/*.zc")]}
 
 def blocks(text):
     return [(m.group(1), m.group(2).rstrip("\n")) for m in re.finditer(r"^```(\w*)\n(.*?)^```", text, re.M | re.S)]
@@ -84,6 +85,7 @@ else:
 
 with tempfile.TemporaryDirectory(prefix="zil-tour.") as work:
     run_section("tour", section("## A tour", "## Writing your own library"), work)
+    run_section("certify", section("## Certifying the engine's answers", None), work)
     if with_tool:
         run_section("apalache", section("## Checking TLA+ models with Apalache", None), work)
     else:
