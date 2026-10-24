@@ -100,6 +100,30 @@ Init == edge \in SUBSET (Nodes \X Nodes)
 - Run with `--cinit=ConstInit --length=0`: a false invariant is found in 3 s (exit 12), a true one passes (exit 0). Apalache picks
   `edge` among all 2^9 subsets symbolically.
 
+## An invented model: what it showed
+
+`test/fixtures/apalache/LockStep.tla` has two counters that move together (two variables, two constants, `Max = 5`). `Bounded` (`b <= Max`)
+is true in every reachable state but is not inductive; `IndInv` (`Bounded` and `a = b`) is inductive; `CInitFault` makes `b` move by 2.
+Times are wall-clock for the whole command, including JVM start. `induct` runs the tool twice, the base case and the step.
+
+| Command | Result | Time |
+|---|---|---|
+| `check --inv=Bounded --length=5` | no violation (exit 0) | 6 s |
+| `check --inv=Bounded --length=5`, `CInitFault` | violation (exit 12) | 5 s |
+| `induct`, `WeakInit`, `Bounded` | not inductive: from `a = 0, b = 5` one step reaches `b = 6` | 9 s |
+| `induct`, `StrongInit`, `IndInv` | inductive at `Max = 5` | 9 s |
+| `induct`, `StrongInit`, `IndInv`, `CInitFault` | the step check fails | 8 s |
+
+Reading it:
+
+- **A bounded check says nothing beyond its length.** Five steps pass. With `--length=8` the tool reports a deadlock (exit 12), because `Next`
+  cannot be taken a sixth time.
+- **The induction check names the missing conjunct.** The counterexample to induction is a state that satisfies `Bounded` and leaves it after
+  one step; it is unreachable, and it shows that the counters must be equal. With that conjunct added, `Init ⇒ IndInv` and
+  `IndInv ∧ Next ⇒ IndInv'` both hold, which is a proof for every depth at this value of `Max`.
+- **The check can fail.** With the defect switched on, the step check fails (exit 12), as the bounded check does.
+- The fixed constants are still a bound. A statement for every value of `Max` needs a proof outside the tool.
+
 ## Not covered
 
 - Liveness and temporal properties: not tested; the safety invariants are what this looked at.
