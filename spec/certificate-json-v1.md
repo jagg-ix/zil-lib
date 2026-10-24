@@ -78,6 +78,13 @@ Node fields:
     - `{"node": "name"}`: node term.
     - `{"var": "x"}`: variable term.
 
+### 3.3 Injective Name Encoding
+Entity node names, relation symbols, and attribute keys are dot-separated component sequences (`c1.c2...`), mapping bijectively to Lean `Name` constructors (`.str` and `.num`):
+- String components escape `\` as `\\`, `.` as `\.`, and a leading `#` as `\#`.
+- Numeric components are encoded as `#{n}`.
+- Components are joined with `.` (dot).
+This guarantees that node names containing string literals, special characters, or dots (e.g. `value."cluster_state_v3"` or IP/URL literals) invert bijectively during certificate serialization, verification, and byte comparison.
+
 ## 4. Invariants of an Ordered Proof Graph
 
 The certificate must satisfy the following structural and semantic invariants:

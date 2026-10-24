@@ -132,15 +132,25 @@ lake exe zilLib certify examples/tour/01-blast-radius.zc --json "$work/tour2.cer
 cmp -s "$work/tour.cert.json" "$work/tour2.cert.json" && pass "certify: the JSON certificate is byte-deterministic" \
   || fail "certify: the JSON certificate is not byte-deterministic"
 # a model is read with the macro libraries named by --lib, as the core's expand reads them
-rows=0; unsound=""
+rows=0; unsound=""; json_unsound=""
 while IFS=$'\t' read -r name library model; do
   case "$library" in -) options=() ;; @*) options=(--lib "${library#@}") ;; *) options=(--lib "$library") ;; esac
   rows=$((rows + 1))
-  lake exe zilLib certify "$model" ${options[@]+"${options[@]}"} --verified >"$work/row.out" 2>"$work/row.err" || unsound="$unsound $name"
+  lake exe zilLib certify "$model" ${options[@]+"${options[@]}"} --verified --json "$work/$name.cert.json" >"$work/row.out" 2>"$work/row.err" || unsound="$unsound $name"
   grep -q "proved checker.*accepted" "$work/row.out" || unsound="$unsound $name(proved)"
+  lake exe zilLib certify "$model" ${options[@]+"${options[@]}"} "$work/$name.cert.json" --json "$work/$name.cert2.json" >/dev/null 2>&1 || json_unsound="$json_unsound $name(verify)"
+  cmp -s "$work/$name.cert.json" "$work/$name.cert2.json" || json_unsound="$json_unsound $name(bytes)"
 done < <(grep -v "^#" spec/macro-extension-matrix.tsv)
 [[ "$rows" -eq 18 && -z "$unsound" ]] && pass "certify: all $rows models of spec/macro-extension-matrix.tsv, read with their libraries, are certified, and accepted by the proved checker" \
   || fail "certify: $rows rows read, not certified:$unsound"
+[[ "$rows" -eq 18 && -z "$json_unsound" ]] && pass "certify: all $rows models of spec/macro-extension-matrix.tsv: JSON certificates read back, certified, and byte-deterministic" \
+  || fail "certify: $rows JSON certificates read, not certified:$json_unsound"
+lake exe zilLib certify examples/tour/01-blast-radius.zc --json >"$work/stdout.cert.json" 2>"$work/stdout.cert.err"
+if python3 -I -c 'import json, sys; d = json.load(open(sys.argv[1])); assert d["format"] == "ZIL-CERTIFICATE/1"' "$work/stdout.cert.json" 2>/dev/null; then
+  pass "certify: --json without a file writes valid JSON to stdout without text report"
+else
+  fail "certify: --json without a file does not write valid JSON to stdout"
+fi
 exit_of 0 "certify: the tour model is also accepted by the proved checker (--verified)" lake exe zilLib certify examples/tour/01-blast-radius.zc --verified
 grep -q 'proved checker.*accepted' "$work/command.out" && pass "certify: the proved checker's verdict is printed" || fail "certify: the proved checker's verdict is missing"
 exit_of 0 "certify: the answers to a query are certified" lake exe zilLib certify examples/tour/01-blast-radius.zc --query single_points
