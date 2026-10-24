@@ -38,3 +38,8 @@ lean_exe zilLibLowerTests where
 /-- Tests of check vocabulary and universal contract checking (Batch 3: APL-05 and APL-30). -/
 lean_exe zilLibBatch3Tests where
   root := `ZilLib.Test.Batch3Main
+
+/-- Tests of operations, temporal governance, and non-interference (Batch 4: APL-31, APL-32, APL-33). -/
+lean_exe zilLibBatch4Tests where
+  root := `ZilLib.Test.Batch4Main
+

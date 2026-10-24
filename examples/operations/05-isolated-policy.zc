@@ -1,0 +1,28 @@
+MODULE check.operations.isolated.policy.
+
+// Example 5 for APL-33: Isolated Policy (Strategic Result S3).
+// A system where private/high operations and public/low operations are strictly partitioned.
+// The public operation (public_op) modifies only public_state.
+// The private operation (private_op) modifies only private_state.
+// Non-interference hyperproperty checking over public_state proves that no leak occurs.
+
+node:sys#kind@entity:system.
+node:user1#kind@entity:user.
+node:val_true#kind@entity:boolean.
+
+// Declare public projection: only public_state is publicly observable
+USE CHECK_PUBLIC(pub_output, public_state).
+
+// Guard query on user existence
+QUERY guard_user:
+FIND ?u WHERE ?u#kind@entity:user.
+
+// Public operation modifies only public_state
+USE CHECK_OPERATION(public_op, guard_user).
+USE CHECK_OPERATION_PARAM(public_op, caller, user).
+USE CHECK_OPERATION_ADD(public_op, sys, public_state, val_true).
+
+// Private operation modifies only private_state
+USE CHECK_OPERATION(private_op, guard_user).
+USE CHECK_OPERATION_PARAM(private_op, caller, user).
+USE CHECK_OPERATION_ADD(private_op, sys, private_state, val_true).

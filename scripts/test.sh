@@ -57,7 +57,7 @@ else fail "the pin in lakefile.lean ($pinned) and lake-manifest.json ($resolved)
 # 2. build
 if [[ "$skip_build" -eq 0 ]]; then
   # the library gates run the core's compiler and audit and typecheck against its library: build them with the package
-  targets=(zilLibApalacheTests zilLibCertifyTests zilLibSmtTests zilLibLowerTests zilLibBatch3Tests); [[ "$full" -eq 1 ]] && targets+=(zilLibTests zil-lean/zil zil-lean/zilTheoremAudit zil-lean/Zil)
+  targets=(zilLibApalacheTests zilLibCertifyTests zilLibSmtTests zilLibLowerTests zilLibBatch3Tests zilLibBatch4Tests); [[ "$full" -eq 1 ]] && targets+=(zilLibTests zil-lean/zil zil-lean/zilTheoremAudit zil-lean/Zil)
   if lake build "${targets[@]}" >"$work/build.log" 2>&1; then pass "a build with failing java, apalache-mc and clojure shims succeeds"
   else fail "build"; tail -20 "$work/build.log" >&2; fi
 fi
@@ -239,7 +239,24 @@ grep -q 'violation-found (depth 3, replayed)' "$work/command.out" && pass "zilLi
 
 exit_of 2 "zilLib universal: nonexistent model" lake exe zilLib universal examples/does-not-exist.zc
 
-# 9. the libraries
+# 9. Operations, Temporal Governance (S2) & Non-Interference (S3) (Batch 4: APL-31, APL-32 / S2, APL-33 / S3)
+if [[ "$(lake exe zilLibBatch4Tests $lower_opt 2>&1 | tee "$work/batch4-tests.log" | tail -1)" =~ ^[0-9]+\ passed,\ 0\ failed$ ]]; then
+  pass "Operations & Temporal Governance: APL-31 ops, S2 BMC & lockout replay, S3 non-interference ($(tail -1 "$work/batch4-tests.log"))"
+else fail "Batch 4 Tests"; grep '^FAIL' "$work/batch4-tests.log" >&2 || tail -5 "$work/batch4-tests.log" >&2; fi
+
+exit_of 0 "zilLib trace: clean dual-control separation of duty policy" lake exe zilLib trace examples/operations/03-separation-of-duty.zc --depth 4
+exit_of 1 "zilLib trace: admin lockout detected and replayed" lake exe zilLib trace examples/operations/02-admin-lockout.zc --depth 3
+grep -q 'violation found at depth 1' "$work/command.out" && pass "zilLib trace: lockout violation reported" || fail "zilLib trace: lockout violation missing"
+grep -q 'trace confirmed and replayed by Lean reference executor' "$work/command.out" && pass "zilLib trace: trace replayed and confirmed" || fail "zilLib trace: trace confirmation missing"
+
+exit_of 0 "zilLib noninterference: isolated policy satisfies non-interference" lake exe zilLib noninterference examples/operations/05-isolated-policy.zc --depth 3
+exit_of 1 "zilLib noninterference: leaking policy detects non-interference violation" lake exe zilLib noninterference examples/operations/04-leaking-policy.zc --depth 2
+grep -q 'information leak found at depth 1' "$work/command.out" && pass "zilLib noninterference: information leak reported" || fail "zilLib noninterference: information leak missing"
+
+exit_of 2 "zilLib trace: nonexistent model" lake exe zilLib trace examples/does-not-exist.zc
+exit_of 2 "zilLib noninterference: nonexistent model" lake exe zilLib noninterference examples/does-not-exist.zc
+
+# 10. the libraries
 if [[ "$full" -eq 1 ]]; then
   step() { # description command...
     local description="$1"; shift

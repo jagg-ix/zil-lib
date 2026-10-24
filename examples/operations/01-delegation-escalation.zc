@@ -1,0 +1,28 @@
+MODULE check.operations.delegation.escalation.
+
+// Flawed delegation example for APL-32: Delegation Escalation.
+// Contains an unconstrained delegation operation that bypasses budget limits,
+// allowing unauthorized delegation to Dave.
+// Invariant asserts Dave must never gain delegation capacity.
+
+node:alice#kind@entity:principal.
+node:bob#kind@entity:principal.
+node:dave#kind@entity:principal.
+
+node:d2#kind@entity:depth.
+node:alice#can_delegate@node:d2.
+
+// Flawed operation: anyone can delegate without budget check
+QUERY guard_always:
+FIND ?p WHERE ?p#kind@entity:principal.
+
+USE CHECK_OPERATION(unconstrained_delegate, guard_always).
+USE CHECK_OPERATION_PARAM(unconstrained_delegate, p_from, principal).
+USE CHECK_OPERATION_PARAM(unconstrained_delegate, p_to, principal).
+USE CHECK_OPERATION_ADD(unconstrained_delegate, p_to, can_delegate, d2).
+
+// Invariant: Dave must never gain can_delegate
+QUERY inv_dave_delegation:
+FIND ?d WHERE node:dave#can_delegate@?d.
+
+USE CHECK_INVARIANT(no_dave_delegation, inv_dave_delegation).

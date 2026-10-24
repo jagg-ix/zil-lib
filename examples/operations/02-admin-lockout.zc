@@ -1,0 +1,36 @@
+MODULE check.operations.admin.lockout.
+
+// Invented example 2 for APL-31 and APL-32:
+// Administrator who can remove the last administrator, leading to lockout.
+// Initial state: admin1 and admin2 are administrators; admin1 is the anchor administrator.
+// Guard query requires the caller to be an administrator.
+// Operation revoke_admin removes the admin role from a target user.
+// Flaw: the policy allows removing the anchor administrator, allowing a sequence
+// of revokes to leave zero administrators (lockout at step 2).
+
+node:admin1#kind@entity:subject.
+node:admin2#kind@entity:subject.
+node:user1#kind@entity:subject.
+
+role:admin#kind@entity:role.
+
+// Initial assignments
+node:admin1#has_role@role:admin.
+node:admin2#has_role@role:admin.
+node:admin1#is_anchor@bool:true.
+
+// Guard query: caller must hold admin role
+QUERY guard_caller_is_admin:
+FIND ?p_caller WHERE ?p_caller#has_role@role:admin.
+
+// Operation: revoke admin role
+USE CHECK_OPERATION(revoke_admin, guard_caller_is_admin).
+USE CHECK_OPERATION_PARAM(revoke_admin, p_caller, subject).
+USE CHECK_OPERATION_PARAM(revoke_admin, p_target, subject).
+USE CHECK_OPERATION_REMOVE(revoke_admin, p_target, has_role, admin).
+
+// Invariant: anchor administrator must never be stripped of administrative authority
+USE CHECK_INVARIANT(admin_lockout, query_anchor_admin_lost).
+
+QUERY query_anchor_admin_lost:
+FIND ?u WHERE ?u#is_anchor@bool:true AND NOT ?u#has_role@role:admin.

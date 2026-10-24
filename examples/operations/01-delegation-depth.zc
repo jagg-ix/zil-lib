@@ -1,0 +1,47 @@
+MODULE check.operations.delegation.depth.
+
+// Invented example 1 for APL-31: Delegation with a bounded depth.
+// Alice has root delegation authority with depth 2.
+// When alice delegates to bob, bob receives depth 1.
+// When bob delegates to charlie, charlie receives depth 0 (exhausted).
+// Charlie attempting to delegate to dave fails the guard query.
+
+node:alice#kind@entity:principal.
+node:bob#kind@entity:principal.
+node:charlie#kind@entity:principal.
+node:dave#kind@entity:principal.
+
+depth:d2#kind@entity:depth.
+depth:d1#kind@entity:depth.
+depth:d0#kind@entity:depth.
+
+// Initial assignment: alice holds root delegation at budget d2
+node:alice#can_delegate@depth:d2.
+
+// Rules deriving downstream delegation capacity
+RULE r_delegate_step1:
+IF ?from#can_delegate@depth:d2 AND ?from#delegates_to@?to
+THEN ?to#can_delegate@depth:d1.
+
+RULE r_delegate_step2:
+IF ?from#can_delegate@depth:d1 AND ?from#delegates_to@?to
+THEN ?to#can_delegate@depth:d0.
+
+// Guard query: a principal can delegate only if they hold active depth d2 or d1
+QUERY guard_can_delegate:
+FIND ?p_from WHERE ?p_from#can_delegate@depth:d2.
+
+QUERY guard_can_delegate_step:
+FIND ?p_from WHERE ?p_from#can_delegate@depth:d1.
+
+// Operations:
+// delegate: delegator with budget creates a delegation edge
+USE CHECK_OPERATION(delegate_root, guard_can_delegate).
+USE CHECK_OPERATION_PARAM(delegate_root, p_from, principal).
+USE CHECK_OPERATION_PARAM(delegate_root, p_to, principal).
+USE CHECK_OPERATION_ADD(delegate_root, p_from, delegates_to, p_to).
+
+USE CHECK_OPERATION(delegate_sub, guard_can_delegate_step).
+USE CHECK_OPERATION_PARAM(delegate_sub, p_from, principal).
+USE CHECK_OPERATION_PARAM(delegate_sub, p_to, principal).
+USE CHECK_OPERATION_ADD(delegate_sub, p_from, delegates_to, p_to).

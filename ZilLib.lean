@@ -6,3 +6,4 @@ import ZilLib.TransitionSystem
 import ZilLib.SMT
 import ZilLib.Lower
 import ZilLib.Lower.Universal
+import ZilLib.Operation

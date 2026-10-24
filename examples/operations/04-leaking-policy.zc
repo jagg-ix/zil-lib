@@ -1,0 +1,33 @@
+MODULE check.operations.leaking.policy.
+
+// Example 4 for APL-33: Leaking Policy (Strategic Result S3).
+// A system with private/high data (secret_data) and public/low output (public_flag).
+// The leak_secret operation contains an information leak:
+// if secret_data is present on a user, it sets public_flag to true on the public system node.
+// Non-interference hyperproperty checking over public_flag detects the 2-safety violation.
+
+node:sys#kind@entity:system.
+node:user1#kind@entity:user.
+node:val_true#kind@entity:boolean.
+
+// Declare public projection: only public_flag is publicly observable
+USE CHECK_PUBLIC(pub_output, public_flag).
+
+// Guard query: checks if user has secret data
+QUERY guard_has_secret:
+FIND ?u WHERE ?u#secret_data@node:val_true.
+
+// Guard query: always true for user
+QUERY guard_always:
+FIND ?u WHERE ?u#kind@entity:user.
+
+// Operation that leaks private state to public channel:
+// Calling leak_secret checks if caller has secret_data, and if so, publishes public_flag to system.
+USE CHECK_OPERATION(leak_secret, guard_has_secret).
+USE CHECK_OPERATION_PARAM(leak_secret, caller, user).
+USE CHECK_OPERATION_ADD(leak_secret, sys, public_flag, val_true).
+
+// Normal benign public operation
+USE CHECK_OPERATION(benign_ping, guard_always).
+USE CHECK_OPERATION_PARAM(benign_ping, caller, user).
+USE CHECK_OPERATION_ADD(benign_ping, caller, ping_received, val_true).

@@ -1,0 +1,46 @@
+MODULE check.operations.separation.duty.
+
+// Example 3 for APL-32: Separation of Duty (Strategic Result S2).
+// Dual-control: a transaction cannot be approved by its own requester.
+// Alice is assigned the requester role; Bob is assigned the approver role.
+// Operations:
+// - request_tx(tx, caller): caller creates a transaction request (guarded by has_role requester).
+// - approve_tx(tx, caller): caller approves a transaction (guarded by has_role approver).
+// Invariant: no self-approval (no principal is both requester and approver for the same tx).
+
+node:alice#kind@entity:principal.
+node:bob#kind@entity:principal.
+node:tx1#kind@entity:transaction.
+
+role:requester#kind@entity:role.
+role:approver#kind@entity:role.
+
+// Role assignments: Alice is requester, Bob is approver
+node:alice#has_role@role:requester.
+node:bob#has_role@role:approver.
+
+// Queries for operation guards
+QUERY guard_is_requester:
+FIND ?caller WHERE ?caller#has_role@role:requester.
+
+QUERY guard_is_approver:
+FIND ?caller WHERE ?caller#has_role@role:approver.
+
+// Query representing violation of separation-of-duty:
+// A transaction has the same principal as both requester and approver
+QUERY inv_self_approval_conflict:
+FIND ?tx WHERE ?tx#requester@?p AND ?tx#approver@?p.
+
+// Declare safety invariant
+USE CHECK_INVARIANT(no_self_approval, inv_self_approval_conflict).
+
+// Operations
+USE CHECK_OPERATION(request_tx, guard_is_requester).
+USE CHECK_OPERATION_PARAM(request_tx, tx, transaction).
+USE CHECK_OPERATION_PARAM(request_tx, caller, principal).
+USE CHECK_OPERATION_ADD(request_tx, tx, requester, caller).
+
+USE CHECK_OPERATION(approve_tx, guard_is_approver).
+USE CHECK_OPERATION_PARAM(approve_tx, tx, transaction).
+USE CHECK_OPERATION_PARAM(approve_tx, caller, principal).
+USE CHECK_OPERATION_ADD(approve_tx, tx, approver, caller).
