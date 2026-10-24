@@ -13,7 +13,7 @@ namespace ZilLib.Test.TransitionSystem
 open Lean Elab Command
 open ZilLib.TransitionSystem
 
--- Helper to construct state with single integer variable
+-- State constructor with single integer variable
 def stateX (val : Int) : TSState :=
   ⟨#[.int val]⟩
 
@@ -81,9 +81,17 @@ run_cmd do
   if replayTrace counterCandidateInv traceNotViolating "x_le_1" then
     throwError "replayTrace reported violation when invariant held at terminal state"
 
+  -- (f) Empty trace must be refused
+  if replayTrace counterCandidateInv [] "x_le_1" then
+    throwError "replayTrace accepted empty trace"
+
+  -- (g) Unknown invariant name must be refused
+  if replayTrace counterCandidateInv traceViolating "nonexistent_inv" then
+    throwError "replayTrace accepted unknown invariant name"
+
 -- 4. Theorem and Axiom checks
 run_cmd do
-  for thm in [``counter_safe, ``reachable_iff_reachableIn, ``denote_agree, ``denote_init_agree, ``denote_next_agree] do
+  for thm in [``counter_int_safe, ``counter_module_safe, ``reachable_iff_reachableIn, ``denote_agree, ``denote_init_agree, ``evalBool_ge_agree, ``checkTransitions_reachableIn, ``replayTrace_soundness] do
     let axioms ← liftCoreM <| collectAxioms thm
     for ax in axioms do
       unless ax == ``propext || ax == ``Classical.choice || ax == ``Quot.sound do
