@@ -150,7 +150,7 @@ table) and `docs/move-libsets.md` (the LIB table) are updated in the same change
 | Batch | Targets | Why here | Done when |
 |---|---|---|---|
 | 0 | the M3 decision point; the ordering of the open questions | `docs/apalache-plan.md` says Track A beyond M3 continues only if the induction check is useful on models other than the one it was written on | done 2026-10-24: three invented models (`TwoProcLock`, `TokenArbiter`, `RingBuffer`) qualified with Apalache 0.62.4; decision resolved as GO in `docs/apalache-plan.md` and commands documented in `docs/tool-notes.md` |
-| S | TS-00 to TS-05 | a semantic transition-system layer and a second, independent backend (SMT through PySMT) come before the Apalache lowering, which then targets the same layer | each as the TS table says; TS-00 is accepted by the maintainer before TS-01 starts |
+| S | TS-00 to TS-05 | a semantic transition-system layer and a second, independent backend (SMT-LIB text and the `z3` executable) come before the Apalache lowering, which then targets the same layer | each as the TS table says; TS-00 is accepted by the maintainer before TS-01 starts |
 | 1 | APL-00, APL-10, APL-11 | nothing is lowered before the contract is written and accepted; the IR and its printer are needed by every later step | the contract answers the seven open questions below, with the reason for each; the IR round-trips on twelve hand-written modules and matches golden bytes; the printed text is accepted by the tool's own parser |
 | 2 | APL-12, APL-13, APL-14, APL-22, APL-23, CERT-12 | the lowering exists and agrees with the evaluator, then the tool's counterexamples are replayed | on 1,000 random programs from `ZilLib/Test/Differential.lean` the lowered program at length 0 has the engine's closure; a real counterexample is confirmed by replay and a fabricated one is refused |
 | 3 | APL-05 (= LIB-14), APL-30 | the vocabulary for saying what to check, then the first strategic result (S1) | S1 as the table says: the seeded flaw is found at N ≤ 3 and replayed |
@@ -164,11 +164,11 @@ repository); whether a pull request is merged or the target is pushed to `main`;
 engine and the Lean-embedded evaluator should treat a variable in an attribute pattern alike (the engine binds it only to a node, the
 evaluator to any value; `ZilLib/Certify/Verified.lean` refuses the difference today).
 
-## Transition systems, and an SMT backend through PySMT (proposed 2026-10-24)
+## Transition systems, and an SMT-LIB backend (proposed 2026-10-24, changed the same day: z3 directly, not PySMT)
 
 The idea: the semantics lives in Lean and the backends are interchangeable. A specification, written as TLA+ source or lowered from a ZIL
 program, becomes a value of a Lean type; that value has a meaning in Lean (so safety properties can be proved there as ordinary theorems)
-and is the input of each backend (Apalache, an SMT solver through PySMT, later others). The TLA+ source stays the authoritative text.
+and is the input of each backend (Apalache, an SMT solver through SMT-LIB 2 text, later others). The TLA+ source stays the authoritative text.
 
 ```lean
 class TransitionSystem where
@@ -193,13 +193,19 @@ their location, and a refusal is the right answer.
 | TS-00 | Contract | `spec/transition-system-v0.1.md` states the two layers, the fragment and what is refused, the assurance rule (a violation is reported only when Lean's reference replays it; a solver result is `externally-attested`, never `kernel-backed`) and the build rule (no Java, Python or solver in the build or the gate); the maintainer accepts it | none | not started |
 | TS-01 | Types and denotation | `ZilLib/TransitionSystem.lean`: the class, `TSModule`, `denote`, the agreement theorem, a bounded reachability function in Lean (the reference for replay), and the counter (`x = 0`, `x' = x + 1`, invariant `x ≥ 0`) with the invariant proved in Lean as an ordinary theorem by induction | TS-00 | not started |
 | TS-02 | TLA+ front end | `zilLib tla export X.tla` runs SANY's XML exporter (the tool the machine has) and writes `X.tla.json`; Lean reads it to a `TSModule`; `tla_file "X.tla"` checks the hash and says to run the export when it is stale. `Counter` and two more invented modules import; a construct outside the fragment is refused with its location. Optional: a Lean parser for the fragment, so that `tla%{ ... }` with inline text works without Java, tested against the snapshots of the same modules | TS-00, TS-01 | not started |
-| TS-03 | PySMT backend | from a `TSModule`: SMT-LIB 2 text and a PySMT script for bounded model checking to depth k and for k-induction (base case and step, as `zilLib apalache induct` does); a model of a violation is read back as a trace and replayed with TS-01's reference, and reported only if Lean confirms; `ZIL-EVIDENCE/1` records the solver and PySMT versions, the hash of the formula and the bounds. Tests that start Python run only with `--with-tool` and say *skipped: pysmt not found* otherwise; PySMT lives in a virtual environment with a pinned version and is never vendored | TS-01 | not started |
-| TS-04 | Two backends agree | on `Counter`, `LockStep` and three invented models (batch 0), PySMT's verdict, Apalache's verdict (through the TLA+ text) and Lean's reference agree on the invariant and on the injected defect; a disagreement is filed as a defect of one backend with both traces | TS-03, batch 0 | not started |
-| TS-05 | ZIL as a source | the lowering of APL-12 to APL-14 targets `TSModule`; Apalache and PySMT both consume it; APL-10's IR is the emitter from `TSModule` to Apalache. APL-00 says so | TS-01, APL-00 | not started |
+| TS-03 | SMT-LIB backend | from a `TSModule`, SMT-LIB 2 text for bounded model checking to depth k and for k-induction (base case and step, as `zilLib apalache induct` does), one `push`/`pop` query per depth; the toolkit runs the solver as a process (default `z3`; any solver that reads SMT-LIB 2 by name, such as cvc5 when it is installed), with a deadline (`-T:` for z3), reads `sat`, `unsat` or `unknown` and the values of `get-value`, and turns a model into a trace that TS-01's reference replays; a violation is reported only if Lean confirms, and `unknown` or a timeout is *inconclusive*, never a pass; `ZIL-EVIDENCE/1` records the solver and its version, the hash of the SMT-LIB text and the bounds. No Python, no solver library and no binding: Lean writes the text and reads the answer. Tests that start the solver run only with `--with-tool` and say *skipped: z3 not found* otherwise | TS-01 | not started |
+| TS-04 | Two backends agree | on `Counter`, `LockStep` and three invented models (batch 0), the SMT-LIB backend's verdict (and a second solver's, if one is installed), Apalache's verdict (through the TLA+ text) and Lean's reference agree on the invariant and on the injected defect; a disagreement is filed as a defect of one backend with both traces | TS-03, batch 0 | not started |
+| TS-05 | ZIL as a source | the lowering of APL-12 to APL-14 targets `TSModule`; Apalache and the SMT-LIB backend both consume it; APL-10's IR is the emitter from `TSModule` to Apalache. APL-00 says so | TS-01, APL-00 | not started |
+| TS-07 | Kernel-backed induction step (proposed, optional) | for the linear-arithmetic fragment, the induction step `Inv(s) and Next(s,s') imply Inv(s')` as a Lean theorem through lean-smt, which asks cvc5 for a proof and replays it in Lean's kernel (it replays about 200 of cvc5's 662 proof rules; a step it cannot replay is left to the user). This is the only route here by which a solver's answer becomes `kernel-backed`; z3 and the text backend never are. It needs cvc5 built through Lake's FFI, so it lives in a separate package and the gate stays free of external tools | TS-03 | not started |
 | TS-06 | Other backends (proposed, not assigned) | Soufflé, OCaml and others from `TSModule`, each tested differentially against Lean's reference | TS-04 | not started |
 
 SMT-LIB is also what the core's `PROOF_OBLIGATION` with `tool=z3` and its external-solver extension (`examples/extensions/external-solver-*.json`)
-already take, so TS-03's `.smt2` output can be given to that extension as it is.
+already take (they run `z3 {input}`), so TS-03's `.smt2` output can be given to that extension as it is, and the evidence path already exists.
+
+Why not PySMT or a solver library: they add Python or a native library to a toolkit that has none, and SMT-LIB 2 text already gives what
+PySMT is for, one input for several solvers. The Z3 bindings for OCaml and lean-auto's use of z3 give nothing more here: lean-auto trusts
+z3's answer, lean-smt supports cvc5 only, and the toolkit has no OCaml. A prototype of the text route (a bounded check to depth 3 and a
+k-induction on the counter) answers in 30 ms with the `z3` executable, against about 5 s of JVM start for Apalache.
 
 ## Open questions for APL-00
 
