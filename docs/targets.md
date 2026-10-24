@@ -141,6 +141,28 @@ Order that keeps something useful at every step: APL-00, APL-01 and APL-02 (in p
 exists and agrees with the evaluator), then APL-20 to APL-24 (the tool is usable), then S1. APL-31 can start as soon as
 APL-05 is accepted and runs in parallel with APL-10 to APL-14. S2 and S3 follow.
 
+## Work queue (2026-10-24)
+
+What is not done, in the order to do it. A batch is a set of targets that are reviewed together; take the first batch that is not
+finished. Inside a batch every target is its own pull request, and `docs/targets.md` (this table), `docs/certifying-datalog.md` (the CERT
+table) and `docs/move-libsets.md` (the LIB table) are updated in the same change.
+
+| Batch | Targets | Why here | Done when |
+|---|---|---|---|
+| 0 | the M3 decision point; the ordering of the open questions | `docs/apalache-plan.md` says Track A beyond M3 continues only if the induction check is useful on models other than the one it was written on | three invented TLA+ models other than `LockStep.tla` go through `zilLib apalache induct` and `check` with the real tool; the results and the exact commands are in `docs/tool-notes.md`; the plan says *go* or *stop* by its own stop rule |
+| 1 | APL-00, APL-10, APL-11 | nothing is lowered before the contract is written and accepted; the IR and its printer are needed by every later step | the contract answers the seven open questions below, with the reason for each; the IR round-trips on twelve hand-written modules and matches golden bytes; the printed text is accepted by the tool's own parser |
+| 2 | APL-12, APL-13, APL-14, APL-22, APL-23, CERT-12 | the lowering exists and agrees with the evaluator, then the tool's counterexamples are replayed | on 1,000 random programs from `ZilLib/Test/Differential.lean` the lowered program at length 0 has the engine's closure; a real counterexample is confirmed by replay and a fabricated one is refused |
+| 3 | APL-05 (= LIB-14), APL-30 | the vocabulary for saying what to check, then the first strategic result (S1) | S1 as the table says: the seeded flaw is found at N ≤ 3 and replayed |
+| 4 | APL-31, APL-32, APL-33 | operations, temporal governance (S2), non-interference (S3) | S2 and S3 as the table says |
+| 5 | APL-40, APL-42, APL-43, APL-44, APL-45, APL-46 | extensions, each on top of the results above | each as the table says |
+| C | CERT-11, CERT-17 to CERT-21 | the certificate side; independent of batches 1 to 5, so take one when a batch is blocked | each as the CERT table says |
+| L | LIB-13, LIB-15 | one decision, then the move | `lib/` is decided and the runner exists once |
+
+Waits for the maintainer, not for a helper: LIB-10 (a project that pins the core also pins this repository; the project is not in this
+repository); whether a pull request is merged or the target is pushed to `main`; a force push to the core's protected `main`; whether the
+engine and the Lean-embedded evaluator should treat a variable in an attribute pattern alike (the engine binds it only to a node, the
+evaluator to any value; `ZilLib/Certify/Verified.lean` refuses the difference today).
+
 ## Open questions for APL-00
 
 Answer these in the contract before writing code.
