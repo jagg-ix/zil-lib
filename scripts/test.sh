@@ -10,7 +10,8 @@
 # 4. the Apalache modules (trace reader, runner, evidence, induction) and the `zilLib apalache` commands, against a stand-in tool that
 #    starts no JVM, so the failing `java` and `apalache-mc` programs are never called;
 # 5. the certificate checker and `zilLib certify`: the engine's answers checked by an independent program;
-# 6. the SMT-LIB 2 backend and `zilLib smt`: BMC, k-induction, Lean replay reference verification, and ZIL-EVIDENCE/1.
+# 6. the SMT-LIB 2 backend and `zilLib smt`: BMC, k-induction, Lean replay reference verification, and ZIL-EVIDENCE/1;
+# 7. ZIL lowering to transition system and `zilLib check`: facts (APL-12), step operator (APL-13), query invariant (APL-14), witness replay (APL-22), CLI (APL-23), and differential oracle (CERT-12).
 # With --full it also runs everything that qualifies the macro libraries in libsets/ (about ten minutes): the prefix check, the
 # model-substrate Lean tests and examples, the extension gates, the corpus, the 18-row matrix, the AWS+namespace smoke and a
 # byte-for-byte regeneration of the Transfer Family model. With --with-tool it also runs the tests that start the real Apalache
@@ -56,7 +57,7 @@ else fail "the pin in lakefile.lean ($pinned) and lake-manifest.json ($resolved)
 # 2. build
 if [[ "$skip_build" -eq 0 ]]; then
   # the library gates run the core's compiler and audit and typecheck against its library: build them with the package
-  targets=(zilLibApalacheTests zilLibCertifyTests zilLibSmtTests); [[ "$full" -eq 1 ]] && targets+=(zilLibTests zil-lean/zil zil-lean/zilTheoremAudit zil-lean/Zil)
+  targets=(zilLibApalacheTests zilLibCertifyTests zilLibSmtTests zilLibLowerTests); [[ "$full" -eq 1 ]] && targets+=(zilLibTests zil-lean/zil zil-lean/zilTheoremAudit zil-lean/Zil)
   if lake build "${targets[@]}" >"$work/build.log" 2>&1; then pass "a build with failing java, apalache-mc and clojure shims succeeds"
   else fail "build"; tail -20 "$work/build.log" >&2; fi
 fi
@@ -205,7 +206,28 @@ PY
 then pass "zilLib smt: the evidence file is a valid ZIL-EVIDENCE/1 envelope"
 else fail "zilLib smt: the evidence file failed verification"; fi
 
-# 7. the libraries
+# 7. ZIL Lowering, Step Operator, Witness Replay & Check CLI (Batch 2: APL-12, APL-13, APL-14, APL-22, APL-23, CERT-12)
+if [[ "$with_tool" -eq 1 ]]; then
+  lower_opt="--with-tool"
+else
+  lower_opt=""
+fi
+if [[ "$(lake exe zilLibLowerTests $lower_opt 2>&1 | tee "$work/lower-tests.log" | tail -1)" =~ ^[0-9]+\ passed,\ 0\ failed$ ]]; then
+  pass "ZIL Lowering: facts, step operator, replay, differential oracle ($(tail -1 "$work/lower-tests.log"))"
+else fail "ZIL Lowering"; grep '^FAIL' "$work/lower-tests.log" >&2 || tail -5 "$work/lower-tests.log" >&2; fi
+
+exit_of 0 "zilLib typecheck: blast radius model" lake exe zilLib typecheck examples/tour/01-blast-radius.zc
+grep -q '^typecheck: ok' "$work/command.out" && pass "zilLib typecheck: reports structure and stratification" || fail "zilLib typecheck: output missing"
+exit_of 2 "zilLib typecheck: nonexistent model" lake exe zilLib typecheck examples/does-not-exist.zc
+
+exit_of 1 "zilLib check: find blast radius violation" lake exe zilLib check examples/tour/01-blast-radius.zc --inv what_breaks_if_payments_is_down --length 4
+grep -q 'violation found at depth 3' "$work/command.out" && pass "zilLib check: reports violation depth" || fail "zilLib check: violation depth missing"
+grep -q 'replayed and confirmed by Lean reference engine' "$work/command.out" && pass "zilLib check: confirmed by Lean reference engine" || fail "zilLib check: replay confirmation missing"
+
+exit_of 2 "zilLib check: unknown query" lake exe zilLib check examples/tour/01-blast-radius.zc --inv nonexistent_query
+exit_of 2 "zilLib check: missing model" lake exe zilLib check examples/does-not-exist.zc
+
+# 8. the libraries
 if [[ "$full" -eq 1 ]]; then
   step() { # description command...
     local description="$1"; shift

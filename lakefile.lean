@@ -30,3 +30,7 @@ lean_exe zilLibCertifyTests where
 /-- Tests of the SMT-LIB 2 backend (TS-03). -/
 lean_exe zilLibSmtTests where
   root := `ZilLib.Test.SMTMain
+
+/-- Tests of ZIL lowering, step operator, and witness replay (Batch 2). -/
+lean_exe zilLibLowerTests where
+  root := `ZilLib.Test.LowerMain
