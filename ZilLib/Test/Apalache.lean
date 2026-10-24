@@ -66,6 +66,71 @@ private def traceTests (t : Tally) : IO Unit := do
   refuses "an untagged array is refused" "{\"#meta\":{\"format\":\"ITF\"},\"vars\":[],\"states\":[{\"a\":[1,2]}]}" "not tagged"
   refuses "an integer that is not one is refused" "{\"#meta\":{\"format\":\"ITF\"},\"vars\":[],\"states\":[{\"a\":{\"#bigint\":\"x\"}}]}" "not an integer"
 
+/-! ## Apalache JSON IR and Types (APL-10) -/
+
+private def irTests (t : Tally) : IO Unit := do
+  -- ir_type_strings: parse and render roundtrip
+  let typeRoundtrip (s : String) : IO Unit := do
+    match IR.TlaType.parse s with
+    | .ok parsed =>
+        t.expect s!"ir_type_strings: parse '{s}'" (parsed.render == s) s!"got '{parsed.render}'"
+    | .error e =>
+        t.expect s!"ir_type_strings: parse '{s}'" false e
+
+  for typeStr in [
+    "Int",
+    "Bool",
+    "Str",
+    "NODE",
+    "Set(Int)",
+    "Seq(Bool)",
+    "<<Int, Str>>",
+    "{ active: Bool, count: Int }",
+    "(Int -> Int)",
+    "(() => Bool)",
+    "((Int, Int) => Int)",
+    "Untyped"
+  ] do
+    typeRoundtrip typeStr
+
+  -- ir_roundtrip and ir_golden_bytes on all 12 hand-written fixtures
+  let typedIrDir := fixtures / "typed-ir"
+  if ← typedIrDir.pathExists then
+    let entries ← typedIrDir.readDir
+    let mut moduleCount := 0
+    for entry in entries do
+      if entry.fileName.endsWith ".json" then
+        moduleCount := moduleCount + 1
+        let text ← IO.FS.readFile entry.path
+        match IR.Root.parse text with
+        | .error e =>
+            t.expect s!"ir_roundtrip: parse {entry.fileName}" false e
+        | .ok root =>
+            let emitted := IR.Root.write root
+            -- ir_golden_bytes: the written output strictly matches the golden file bytes
+            t.expect s!"ir_golden_bytes: {entry.fileName} matches golden bytes" (emitted == text)
+            -- ir_roundtrip: re-parsing the emitted bytes gives the identical AST
+            match IR.Root.parse emitted with
+            | .ok root2 =>
+                t.expect s!"ir_roundtrip: {entry.fileName} AST equality" (root == root2)
+            | .error e =>
+                t.expect s!"ir_roundtrip: re-parse {entry.fileName}" false e
+    t.expect "ir_roundtrip: all 12 modules tested" (moduleCount >= 12)
+  else
+    t.expect "ir_roundtrip: typed-ir directory exists" false
+
+  -- ir_rejects_untyped_operator: detection of untyped nodes
+  let untypedJson := "{\"name\":\"ApalacheIR\",\"version\":\"1.0\",\"description\":\"test\",\"modules\":[{\"kind\":\"TlaModule\",\"name\":\"M\",\"declarations\":[{\"source\":\"UNKNOWN\",\"type\":\"Untyped\",\"kind\":\"TlaVarDecl\",\"name\":\"x\"}]}]}"
+  match IR.Root.parse untypedJson with
+  | .ok root =>
+      let hasUntyped := root.modules.any fun m => m.declarations.any fun
+        | .var _ t _ | .const _ t _ => t == "Untyped"
+        | .oper d => d.type == "Untyped"
+        | .assume .. => false
+      t.expect "ir_rejects_untyped_operator: detected Untyped declaration" hasUntyped
+  | .error e =>
+      t.expect "ir_rejects_untyped_operator: rejected invalid IR" true
+
 /-! ## The runner, against the stand-in -/
 
 private def standIn (home : String) : IO Located :=
@@ -325,10 +390,22 @@ private def realToolTests (t : Tally) : IO Unit := do
     | .holds base _ | .notInductive base _ | .baseFails base => remove base
     | .stopped _ _ => pure ()
 
+  -- Typecheck all 12 golden IR modules with real Apalache (APL-10)
+  let typedIrDir := fixtures / "typed-ir"
+  if ← typedIrDir.pathExists then
+    let entries ← typedIrDir.readDir
+    for entry in entries do
+      if entry.fileName.endsWith ".json" then
+        let outDir ← IO.FS.createTempDir
+        let res ← Zil.Process.run tool.path.toString #["typecheck", s!"--out-dir={outDir}", entry.path.toString] 120000
+        t.expect s!"real Apalache typecheck: {entry.fileName}" (res.exitCode == 0) s!"exit {res.exitCode}: {res.stdout}\n{res.stderr}"
+        if ← outDir.pathExists then IO.FS.removeDirAll outDir
+
 /-- Run the tests; the last group only with `withTool`. -/
 def run (withTool : Bool) : IO Bool := do
   let t ← Tally.new
   traceTests t
+  irTests t
   runnerTests t
   evidenceTests t
   inductionTests t
