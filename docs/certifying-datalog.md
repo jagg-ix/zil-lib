@@ -100,8 +100,12 @@ regression guards (a chain of 70 steps, an access rule over 70 services); they f
 The report that the previous engine printed for `examples/certify/chain.zc` is kept in `test/fixtures/certify/`, and the checker still
 refuses it. That is the test that the checker would have caught the defect, and it keeps meaning something after the engine is fixed.
 
-A second, smaller finding is not fixed: building the trace takes 12.8 s for 4520 facts, because the provenance builder looks up every fact
-it adds in a list, among other scans. The checker needs 0.4 s for the same facts. The trace is quadratic in the number of facts (CERT-13).
+**A second finding, also fixed (CERT-13, zil-lean `1614a4e`).** Building the trace took 12.8 s for 4520 facts, because the provenance builder
+looked up every fact it added, and matched every premise, by scanning all the nodes. The checker needed 0.4 s for the same facts. The
+builder now indexes its nodes by relation, subject and object, with the buckets in node-number order, so that it visits the candidates in the
+order a scan did. It was checked by running `zil trace` before and after on every model of this repository and on its libraries expanded: the traces are
+byte-identical, and the models that are refused are refused in the same way. A chain of 100 edges with transitive rules (5150 facts) takes
+1.0 s where it took 44.3 s, and generated models of tens of thousands of facts that did not finish in 40 s now do.
 
 ## Targets
 
@@ -119,7 +123,7 @@ it adds in a list, among other scans. The checker needs 0.4 s for the same facts
 | CERT-10 | The semantics in Lean (ground programs, stable and perfect models) and a theorem that a passing check means the perfect model. Read `CertifyingDatalog` and its license before reusing any of it | not started |
 | CERT-11 | A JSON encoding of certificates like the paper's, so that a trace from Nemo or Soufflé can be checked against a ZIL model; relations are ternary here (`subject#relation@object`) with attributes | not started |
 | CERT-12 | Replay of an Apalache counterexample: the trace is mapped to a set of facts and checked with the same matching and closure functions (APL-22) | not started |
-| CERT-13 | The provenance builder of the core is quadratic; an index would bring it near the checker's cost | not started (a change in `zil-lean`) |
+| CERT-13 | The provenance builder of the core is quadratic; an index brings it near the checker's cost | done 2026-10-23, zil-lean `1614a4e`; the traces of every model here are byte-identical before and after |
 
 ## The note's targets, and ours
 

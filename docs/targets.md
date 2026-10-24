@@ -202,4 +202,4 @@ Starting points:
 
 A second list, `CERT-xx`, is about checking the engine's answers with an independent checker, after the ITP 2025 paper on verifying Datalog
 reasoning. It is in `docs/certifying-datalog.md`, with a check of the design note that proposed it against the paper. The checker is
-`zilLib certify`; CERT-01 to CERT-08 are done.
+`zilLib certify`; CERT-01 to CERT-08 and CERT-13 are done.
