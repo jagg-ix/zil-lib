@@ -26,6 +26,11 @@ examples/souffle-transitive-closure.zc	rejected	line 4:1: unknown macro SOUFFLE_
 examples/theorem-dsl-incident.zc	rejected	line 8:1: unknown macro THM_COMPONENT
 examples/theorem-impact-devops-sre.zc	rejected	line 11:1: unknown macro THM_COMPONENT
 examples/tiny.zc	accepted	
+examples/tour/01-blast-radius.zc	accepted	
+examples/tour/02-design-coherence-fixed.zc	rejected	line 6:1: unknown macro MODEL_ENTITY
+examples/tour/02-design-coherence.zc	rejected	line 6:1: unknown macro MODEL_ENTITY
+examples/tour/03-event-order.zc	rejected	line 4:1: unknown macro VC_ACTOR
+examples/tour/04-claims-need-proofs.zc	rejected	line 14:1: unknown macro LEAN_PROOF
 libsets/aws-model/aws-model-macros.zc	accepted	
 libsets/aws-namespace/aws-model-macros.zc	accepted	
 libsets/aws-namespace/aws-namespace-bridge-macros.zc	accepted	
