@@ -11,6 +11,9 @@ tests have real input; they are not edited.
 | `Sym.tla` | written by hand | all graphs over three uninterpreted nodes, with an antisymmetry invariant that does not hold |
 | `sym.violation.itf.json` | `apalache-mc check --cinit=ConstInit --inv=Anti --length=0 Sym.tla` (exit 12) | a trace with a set of tuples, an uninterpreted value (`a_OF_NODE`) and a constant under `params` |
 | `LockStep.tla` | written by hand | two counters that move together; `Bounded` is true but not inductive, `IndInv` (with `InStep`) is inductive, and `CInitFault` breaks it |
+| `TwoProcLock.tla` | written by hand | two processes and a lock; `MutualExclusion` is true but not inductive, `IndInv` (with `HolderMatches`) is inductive, and `CInitFault` breaks it |
+| `TokenArbiter.tla` | written by hand | three processes in a token ring; `OneInUse` is true but not inductive, `IndInv` (with `TokenConsistency`) is inductive, and `CInitFault` breaks it |
+| `RingBuffer.tla` | written by hand | circular queue; `EmptyMeansEqual` is true but not inductive, `IndInv` (with `PointerBalance`) is inductive, and `CInitFault` breaks it |
 | `Stuck.tla` | written by hand | a counter that cannot step past 2: a deadlock, or `ExecutionsTooShort` with `--no-deadlock` |
 | `Untyped.tla` | written by hand | a variable without a type annotation: the tool exits with 255 |
 | `fake-home/bin/apalache-mc` | written by hand | a stand-in for the tool, for tests that must not start a JVM; it reads the model's file name (`fake-models/`) and does what the real tool did in that case |
