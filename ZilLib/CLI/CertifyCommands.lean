@@ -1,11 +1,12 @@
 import ZilLib.Certify
 import ZilLib.Certify.Verified
+import ZilLib.Certify.Query
 import ZilLib.Model
 
 /-!
 # `zilLib certify`
 
-    zilLib certify MODEL.zc [TRACE.txt] [--lib PATH]... [--fuel N] [--limit N] [--verified]
+    zilLib certify MODEL.zc [TRACE.txt] [--lib PATH]... [--fuel N] [--limit N] [--verified] [--query NAME] [--query NAME]
 
 Checks that the facts of a derivation certificate are exactly the facts the model entails. Without `TRACE.txt` the certificate is the
 core's own provenance trace of the model (the engine checked against an independent checker); with it, the certificate is a
@@ -21,6 +22,10 @@ and has to define its macros itself. The certificate is then that of the expande
 translating the program and the certificate into the Lean-embedded Datalog (`ZilLib.Certify.Verified`). That checker is a plain list
 implementation: use it on programs of some hundreds of facts. If the two checkers disagree, that is reported and the exit status is 1.
 
+`--query NAME`, when the certificate passes, also certifies the answers to the query of that name: the rows are computed from the
+certified facts by the checker's own matching (`ZilLib.Certify.Query`) and compared with the rows the engine returns. The rows are then
+the answers, and any other binding is not one.
+
 Exit codes: 0 the certificate passes both checks, 1 it does not, 2 the model or the certificate cannot be read (or, with `--verified`,
 cannot be translated).
 -/
@@ -29,7 +34,7 @@ namespace ZilLib.CLI.CertifyCommands
 
 open ZilLib.Certify
 
-def usage : String := "zilLib certify MODEL.zc [TRACE.txt] [--lib PATH]... [--fuel N] [--limit N] [--verified]"
+def usage : String := "zilLib certify MODEL.zc [TRACE.txt] [--lib PATH]... [--fuel N] [--limit N] [--verified] [--query NAME]"
 
 private def number? (name : String) (args : List String) : Except String (Option Nat) :=
   match args.dropWhile (· != name) with
@@ -49,10 +54,16 @@ private def values (name : String) : List String → Except String (List String)
         | [] => throw s!"{name} needs a value"
       else values name rest
 
+/-- The value of the option `name`, if it is given. -/
+private def value? (name : String) (args : List String) : Option String :=
+  match args.dropWhile (· != name) with
+  | _ :: value :: _ => some value
+  | _ => none
+
 /-- The positional arguments: everything that is not an option or the value of one. -/
 private def positional : List String → List String
   | [] => []
-  | "--fuel" :: _ :: rest | "--limit" :: _ :: rest | "--lib" :: _ :: rest => positional rest
+  | "--fuel" :: _ :: rest | "--limit" :: _ :: rest | "--lib" :: _ :: rest | "--query" :: _ :: rest => positional rest
   | argument :: rest => if argument.startsWith "--" then positional rest else argument :: positional rest
 
 def run (args : List String) : IO UInt32 := do
@@ -103,7 +114,29 @@ def run (args : List String) : IO UInt32 := do
       IO.println "The second checker has a soundness theorem in Lean (docs/certifying-datalog.md, CERT-10); the translation to its representation is trusted."
     else
       IO.println "This is the result of a checker that is tested but not yet verified in Lean (docs/certifying-datalog.md, CERT-10)."
-    return 0
+    match value? "--query" args with
+    | none => return 0
+    | some name =>
+        match program.queries.find? (toString ·.name == name) with
+        | none =>
+            let known := ", ".intercalate (program.queries.toList.map (toString ·.name))
+            IO.eprintln s!"{model}: no query named {name}; the queries are: {known}"
+            return 2
+        | some query =>
+            let facts := certificate.map (·.fact)
+            match ZilLib.Certify.Query.compare facts query with
+            | none =>
+                IO.println s!"query {name}: not answered, because it is not safe (a selected or negated variable is bound by no premise)"
+                return 0
+            | some comparison =>
+                if comparison.agree then
+                  IO.println s!"query {name}: {comparison.rows.size} answer(s), the same rows from the checker and the engine; any other binding is not an answer"
+                  for row in comparison.rows do IO.println s!"  {ZilLib.Certify.Query.renderRow query row}"
+                  return 0
+                IO.println s!"query {name}: the checker and the engine disagree"
+                for row in comparison.onlyChecker do IO.println s!"  only the checker: {ZilLib.Certify.Query.renderRow query row}"
+                for row in comparison.onlyEngine do IO.println s!"  only the engine: {ZilLib.Certify.Query.renderRow query row}"
+                return 1
   IO.println s!"NOT certified: {report.problemCount} problem(s){if report.problemCount > report.problems.size then s!", the first {report.problems.size} shown" else ""}"
   for problem in report.problems do
     let where_ := match problem.node with | some node => s!" (fact {node})" | none => ""

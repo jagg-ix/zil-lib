@@ -1,6 +1,7 @@
 import ZilLib.Certify
 import ZilLib.LeanFacts
 import ZilLib.Certify.Verified
+import ZilLib.Certify.Query
 import ZilLib.Model
 import ZilLib.Test.Harness
 
@@ -173,6 +174,43 @@ private def faultTests (t : Tally) : IO Unit := do
   t.expect "proved checker: refuses a database fact that the certificate lacks"
     (match Verified.check (blast.facts.push extraFact) blast.allRules good with | .ok answer => !answer | .error _ => false)
 
+/-- The answers to a query, computed by the checker from the certified facts, are the engine's. -/
+private def queryTests (t : Tally) : IO Unit := do
+  let blast ← ZilLib.loadProgram "examples/tour/01-blast-radius.zc"
+  let good ← certificate blast
+  let facts := good.map (·.fact)
+  let find (name : String) := blast.queries.find? (toString ·.name == name)
+  match find "single_points", find "what_breaks_if_payments_is_down" with
+  | some singlePoints, some whatBreaks =>
+      match Query.compare facts singlePoints, Query.compare facts whatBreaks with
+      | some single, some breaks =>
+          t.expect "query single_points: the checker and the engine return the same rows" single.agree
+          t.expect "query single_points: four answers" (single.rows.size == 4)
+          t.expect "query what_breaks_if_payments_is_down: the same rows" breaks.agree
+          t.expect "query what_breaks_if_payments_is_down: one answer, with a negative premise in the program" (breaks.rows.size == 1)
+          -- the checker's rows are computed from the set it is given: take a fact away and they change, and the comparison says so
+          let derivedFact := (facts.find? (·.relation == `zil.singlePointOfFailure)).getD facts[0]!
+          let without := facts.filter (!·.semanticallyEqual derivedFact)
+          t.expect "removing a derived fact from the set changes the rows"
+            (match Query.answers without singlePoints, Query.answers facts singlePoints with
+              | some a, some b => a.size != b.size
+              | _, _ => false)
+          t.expect "an engine that returns other rows than the checker is reported"
+            (match Query.compareOver without facts singlePoints with | some c => !c.agree && !c.onlyEngine.isEmpty | none => false)
+      | _, _ => t.expect "the tour queries are safe" false
+  | _, _ => t.expect "the tour model has the queries single_points and what_breaks_if_payments_is_down" false
+  -- a query that no positive premise binds a selected variable of is not answered, as in the engine
+  let unbound : Query := { name := `unbound, variables := #[`x], select := #[`x], premises := #[] }
+  t.expect "a query with an unbound selected variable is not answered" ((Query.answers facts unbound).isNone)
+  -- a negative premise removes rows: services that nothing depends on
+  let callsAB : RelExpr := .mk' (.variable `a) `calls (.variable `b)
+  let callsBA : RelExpr := .mk' (.variable `b) `calls (.variable `a)
+  let negated : Query := { name := `negated, variables := #[`a, `b], select := #[`a], premises := #[callsAB], negativePremises := #[callsBA] }
+  t.expect "a negative premise is read against the whole set"
+    (match Query.answers #[fact "a" "calls" "b", fact "b" "calls" "a", fact "c" "calls" "a"] negated with
+      | some rows => rows.size == 1
+      | none => false)
+
 /-- What the translation to the Lean-embedded Datalog keeps apart, and what it refuses. -/
 private def translationTests (t : Tally) : IO Unit := do
   t.expect "two names that print alike are different strings" (Verified.nameText (Lean.Name.mkSimple "a.b") != Verified.nameText `a.b)
@@ -295,6 +333,7 @@ def run : IO Bool := do
   let t ← Tally.new
   leanFactTests t
   translationTests t
+  queryTests t
   matchingTests t
   stratificationTests t
   positiveTests t

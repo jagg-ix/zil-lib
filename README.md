@@ -705,6 +705,31 @@ certificate: 4 facts, 3 from the database and 1 derived
 closure check: 1 rule instances examined
 ```
 
+### Certifying the answers to a query
+
+Once the facts are certified, the answers to a query follow from them by matching alone. `--query NAME` computes the rows of the query
+from the certified facts, with the checker's own matching functions and without the engine's query code, and compares them with the rows
+the engine returns. The rows are then the answers, and any other binding is not an answer, so a negative answer is certified too:
+
+```sh
+zillib certify examples/tour/01-blast-radius.zc --query single_points
+```
+
+```text
+certificate: 31 facts, 9 from the database and 22 derived
+closure check: 22 rule instances examined
+certified: every fact is justified, and no rule derives a fact that is missing, so the facts are exactly those the program entails.
+This is the result of a checker that is tested but not yet verified in Lean (docs/certifying-datalog.md, CERT-10).
+query single_points: 4 answer(s), the same rows from the checker and the engine; any other binding is not an answer
+  j=journey.buy x=service.checkout
+  j=journey.buy x=service.payments
+  j=journey.buy x=service.inventory
+  j=journey.buy x=service.card_gateway
+```
+
+If the two disagree, the command lists the rows only one of them has and exits with status 1. A query that is not safe (a selected or
+negated variable that no premise binds) is not answered by the engine either, and the command says so.
+
 ### A finding: the engine used to stop early on a long chain
 
 The first time this checker ran on a long chain it found a defect in the engine. The engine applies the rules in rounds, and it used to stop

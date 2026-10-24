@@ -138,6 +138,10 @@ done < <(grep -v "^#" spec/macro-extension-matrix.tsv)
   || fail "certify: $rows rows read, not certified:$unsound"
 exit_of 0 "certify: the tour model is also accepted by the proved checker (--verified)" lake exe zilLib certify examples/tour/01-blast-radius.zc --verified
 grep -q 'proved checker.*accepted' "$work/command.out" && pass "certify: the proved checker's verdict is printed" || fail "certify: the proved checker's verdict is missing"
+exit_of 0 "certify: the answers to a query are certified" lake exe zilLib certify examples/tour/01-blast-radius.zc --query single_points
+grep -q 'query single_points: 4 answer(s), the same rows' "$work/command.out" && pass "certify: the four rows of single_points agree with the engine's" || fail "certify: the rows of single_points"
+exit_of 2 "certify: a query that does not exist" lake exe zilLib certify examples/tour/01-blast-radius.zc --query nonexistent
+grep -q 'no query named nonexistent; the queries are: what_breaks_if_payments_is_down, single_points' "$work/command.err" && pass "certify: the unknown query is named, with the queries there are" || fail "certify: the unknown query is not named"
 exit_of 2 "certify: a model that uses a library macro, read without the library" lake exe zilLib certify examples/aws-model-extension-with-icons.zc
 grep -q 'unknown macro AWS_PROVIDER' "$work/command.err" && pass "certify: the missing macro is named" || fail "certify: the missing macro is not named"
 exit_of 0 "certify: a library given as one file" lake exe zilLib certify examples/aws-model-extension-with-icons.zc --lib libsets/aws-model/aws-model-macros.zc
