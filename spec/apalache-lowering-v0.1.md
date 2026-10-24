@@ -127,8 +127,26 @@ VARIABLE
 #### 4.5.2 Variable Bindings in Attributes (`[k=?v]`) and Refusal Policy
 In ZIL attribute patterns:
 - The fast execution engine (`Zil.Engine`) binds variables in attribute patterns only when the value is a node identifier (`Node`).
-- The verified Lean-embedded evaluator (`ZilLib/Certify/Verified.lean`, `literalBehindVariable?`) allows binding to any literal value (e.g. integers, strings).
+- The verified Lean evaluator in `zil-lean` (`Zil.Datalog.deriveProgramChecked`) permits binding to any literal value (e.g. integers, strings); the translation layer `ZilLib/Certify/Verified.lean` (`literalBehindVariable?`) currently refuses the difference.
 - **Policy:** The final language design decision on whether attribute variables may bind to non-node literals remains open awaiting maintainer resolution. To guarantee that lowered programs never diverge between the fast engine and the verified reference, the lowering follows a **fail-closed refusal**: any rule or query where `[k=?v]` binds to a non-node literal is refused with an explicit diagnostic (`attribute-variable-non-node-refusal`) until the maintainer decides. Rules binding `?v` to a node (`Node`) are accepted.
+
+### 4.6 Finite-Domain Expansion: Bridging Set(Record) to `TSModule` Variables
+A central architectural requirement is that `TSModule` (TS-00) serves as the unified target for both SMT-LIB 2 / Z3 (TS-03) and Apalache (APL-10).
+While Apalache TLA+ directly supports set comprehensions over uninterpreted `NODE` sorts, `TSModule` operates over discrete state variables (`Bool`, `Int`, and finite enumerations).
+
+To reconcile these representations without polluting the `TSModule` AST with dynamic sets or unbounded quantifiers:
+1. **Finite Domain Universe:** Every bounded verification check operates over a declared or inferred finite domain of $N$ nodes: $\mathcal{U} = \{n_1, \dots, n_N\}$ (represented as a finite enumeration sort in `TSModule`).
+2. **Boolean Bit-Matrix Representation:**
+   - A relation $r$ of arity $k$ over $N$ nodes lowers to $N^k$ boolean variables in `TSModule`:
+     $$r_{u_1, \dots, u_k} \in \text{Bool} \quad \text{for each } (u_1, \dots, u_k) \in \mathcal{U}^k$$
+   - Each attribute key $k_j \in K(r)$ adds a presence flag variable $r\_has\_k_{j, u_1, \dots, u_k} \in \text{Bool}$ and a typed value variable $r\_val\_k_{j, u_1, \dots, u_k} \in \text{Sort}$.
+3. **Quantifier Elimination via Ground Expansion:**
+   - Existential joins ($\exists b \in \mathcal{U} : \dots$) expand into finite disjunctions over the universe:
+     $$\bigvee_{b \in \mathcal{U}} (calls_{a, b} \land calls_{b, c})$$
+   - Universal constraints expand into finite conjunctions ($\bigwedge$).
+4. **Interchangeable Backend Ingestion:**
+   - **For SMT-LIB 2 / Z3:** The expanded $N^k$ boolean and integer variables translate directly to `(declare-const ...)` and propositional formulas in `QF_LIA`, natively optimized for boolean SAT and linear integer arithmetic. Symbolic initial states (APL-30) correspond to unconstrained boolean variables.
+   - **For Apalache:** The emitter can either emit the expanded propositional variables or reconstruct typed `Set(record)` definitions directly, verifying semantic agreement.
 
 ## 5. Closure Depth Bound
 
