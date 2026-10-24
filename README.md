@@ -823,8 +823,9 @@ NOT certified: 1 problem(s)
 * It does not say that the model means what you intended, and it trusts the parser, which decides what the facts and rules are.
 * It is not a proof about this checker. The paper's checker is verified in Lean; this one is tested (`lake exe zilLibCertifyTests`).
   With `--verified` the core's proved checker also accepts the certificate, behind a translation that is trusted. That checker proves
-  that the facts are the only stable model of the program; that this is the perfect model that the engine computes is not proved
-  (`docs/certifying-datalog.md`, CERT-10).
+  that the facts are the only stable model of the program, and the core proves that the result of its own stratum-by-stratum evaluation
+  is that stable model. That the engine, a different implementation, computes the same set is not proved in general: the two are
+  compared on random programs, and `--verified` settles it for the program at hand (`docs/certifying-datalog.md`, CERT-10).
 
 ## Repository layout
 

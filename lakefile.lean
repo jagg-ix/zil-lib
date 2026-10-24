@@ -7,7 +7,7 @@ package «zil-lib» where
   licenseFiles := #["LICENSE"]
 
 /-- The pinned core. Moving this commit is a deliberate act: run `scripts/test.sh` after it. -/
-require «zil-lean» from git "https://github.com/jagg-ix/zil-lean.git" @ "1f172d7727162d73ae099e5e2745df43f28da141"
+require «zil-lean» from git "https://github.com/jagg-ix/zil-lean.git" @ "9790f04de1f059881d6afa67fcad06e63ce220b7"
 
 @[default_target] lean_lib ZilLib where
   roots := #[`ZilLib]
