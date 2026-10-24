@@ -101,28 +101,40 @@ def run (args : List String) : IO UInt32 := do
         match Zil.Engine.Provenance.traceProgram program fuel with
         | .ok trace => pure (Certificate.ofTrace trace)
         | .error problem => IO.eprintln s!"{model}: {problem}"; return 2
-  if args.contains "--json" then
-    match value? "--json" args with
-    | some out =>
-        if out.startsWith "--" then
-          IO.print (renderCertificateJson certificate)
-        else
-          IO.FS.writeFile out (renderCertificateJson certificate)
-    | none =>
-        IO.print (renderCertificateJson certificate)
+  let jsonStdout :=
+    if args.contains "--json" then
+      match value? "--json" args with
+      | some out => out.startsWith "--" || out == "-"
+      | none => true
+    else false
+  let jsonFile :=
+    if args.contains "--json" then
+      match value? "--json" args with
+      | some out => if out.startsWith "--" || out == "-" then none else some out
+      | none => none
+    else none
+  if let some file := jsonFile then
+    IO.FS.writeFile file (renderCertificateJson certificate)
+  else if jsonStdout then
+    IO.print (renderCertificateJson certificate)
   let report := check program.facts program.allRules certificate limit
-  IO.println s!"certificate: {report.facts} facts, {report.database} from the database and {report.derived} derived"
-  IO.println s!"closure check: {report.instances} rule instances examined"
+  if !jsonStdout then
+    IO.println s!"certificate: {report.facts} facts, {report.database} from the database and {report.derived} derived"
+    IO.println s!"closure check: {report.instances} rule instances examined"
   let mut proved := false
   if args.contains "--verified" then
     match ZilLib.Certify.Verified.check program.facts program.allRules certificate with
     | .error problem => IO.eprintln s!"{model}: cannot translate for the proved checker: {problem}"; return 2
     | .ok accepted =>
-        IO.println s!"proved checker (Zil.Datalog.checkCertificate, theorem checkCertificate_sound): {if accepted then "accepted" else "refused"}"
+        if !jsonStdout then
+          IO.println s!"proved checker (Zil.Datalog.checkCertificate, theorem checkCertificate_sound): {if accepted then "accepted" else "refused"}"
         if accepted != report.certified then
-          IO.println "the two checkers disagree; one of them is wrong, and the certificate is not certified"
+          if !jsonStdout then
+            IO.println "the two checkers disagree; one of them is wrong, and the certificate is not certified"
           return 1
         proved := accepted
+  if jsonStdout then
+    return if report.certified && (!args.contains "--verified" || proved) then 0 else 1
   if report.certified then
     IO.println "certified: every fact is justified, and no rule derives a fact that is missing, so the facts are exactly those the program entails."
     if proved then
