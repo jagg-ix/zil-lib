@@ -126,6 +126,27 @@ exit_of 2 "certify: a model that does not exist" lake exe zilLib certify "$work/
 exit_of 2 "certify: a command line without a model" lake exe zilLib certify
 printf 'fact\t0\t0\trel\tnode:a\tr\tnode:b\t\n' >"$work/broken-trace.txt"
 exit_of 2 "certify: a report that cannot be read" lake exe zilLib certify examples/tour/01-blast-radius.zc "$work/broken-trace.txt"
+# a model is read with the macro libraries named by --lib, as the core's expand reads them
+rows=0; unsound=""
+while IFS=$'\t' read -r name library model; do
+  case "$library" in -) options=() ;; @*) options=(--lib "${library#@}") ;; *) options=(--lib "$library") ;; esac
+  rows=$((rows + 1))
+  lake exe zilLib certify "$model" ${options[@]+"${options[@]}"} >"$work/row.out" 2>"$work/row.err" || unsound="$unsound $name"
+done < <(grep -v "^#" spec/macro-extension-matrix.tsv)
+[[ "$rows" -eq 18 && -z "$unsound" ]] && pass "certify: all $rows models of spec/macro-extension-matrix.tsv, read with their libraries, are certified" \
+  || fail "certify: $rows rows read, not certified:$unsound"
+exit_of 2 "certify: a model that uses a library macro, read without the library" lake exe zilLib certify examples/aws-model-extension-with-icons.zc
+grep -q 'unknown macro AWS_PROVIDER' "$work/command.err" && pass "certify: the missing macro is named" || fail "certify: the missing macro is not named"
+exit_of 0 "certify: a library given as one file" lake exe zilLib certify examples/aws-model-extension-with-icons.zc --lib libsets/aws-model/aws-model-macros.zc
+exit_of 0 "certify: three libraries given one by one" lake exe zilLib certify examples/aws-namespace-compat.zc \
+  --lib libsets/aws-model/aws-model-macros.zc --lib libsets/aws-namespace/aws-namespace-bridge-macros.zc --lib libsets/namespace-pn-nd/namespace-pn-nd-macros.zc
+cp "$work/command.out" "$work/three-files.out"
+lake exe zilLib certify examples/aws-namespace-compat.zc --lib libsets/aws-namespace >"$work/directory.out" 2>/dev/null
+cmp -s "$work/three-files.out" "$work/directory.out" && pass "certify: those three files give the same result as the directory that holds them" \
+  || fail "certify: three files and their directory differ"
+exit_of 2 "certify: --lib without a path" lake exe zilLib certify examples/tiny.zc --lib
+exit_of 2 "certify: --lib with a directory that has no .zc file" lake exe zilLib certify examples/tiny.zc --lib test/fixtures/certify
+exit_of 2 "certify: --lib with a path that does not exist" lake exe zilLib certify examples/tiny.zc --lib "$work/absent"
 
 # 6. the libraries
 if [[ "$full" -eq 1 ]]; then

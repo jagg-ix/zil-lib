@@ -117,7 +117,7 @@ byte-identical, and the models that are refused are refused in the same way. A c
 | CERT-04 | A certificate read from text (`ZIL-PROVENANCE/1`), untrusted | done 2026-10-23, `ZilLib/Certify/Text.lean`, `zilLib certify MODEL TRACE` |
 | CERT-05 | The proof graph stays small on the paper's example 3 (650 facts for a chain of 20; a tree has more than a million nodes) | done as a test |
 | CERT-06 | Fault injection: eleven kinds of faulty certificate are refused by name; five faults injected by hand into the checker were each caught by the tests (not repeated by the gate) | done 2026-10-23 |
-| CERT-07 | `zilLib certify` over the macro libraries as a test of the engine | done for the 18 expanded libraries; the model-substrate and the other libraries outside the matrix are not covered |
+| CERT-07 | `zilLib certify` over the macro libraries as a test of the engine | done 2026-10-23 for the 18 rows of the matrix, each model read with its library (`--lib`); the libraries outside the matrix (`model-substrate`, `diff-patch`) are not covered |
 | CERT-08 | The engine reaches the fixpoint or fails; no silent truncation (a change in `zil-lean`) | done 2026-10-23, zil-lean `cdec3f2`; the pin of this repository is there |
 | CERT-09 | Certify one query's answers, including a negative answer ("this fact is not entailed"), from the closure | not started |
 | CERT-10 | The semantics in Lean (ground programs, stable and perfect models) and a theorem that a passing check means the perfect model. Read `CertifyingDatalog` and its license before reusing any of it | not started |

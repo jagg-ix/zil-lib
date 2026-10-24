@@ -621,6 +621,32 @@ certified: every fact is justified, and no rule derives a fact that is missing, 
 This is the result of a checker that is tested but not yet verified in Lean (docs/certifying-datalog.md, CERT-10).
 ```
 
+A model that uses macros from a library is read with that library, as `zil expand` reads it. `--lib PATH` prepends the `.zc` files of a
+directory in name order, or one `.zc` file, and may be given more than once. The certificate is that of the expanded program, which is the
+program the engine runs. Without the option, the model has to define its own macros:
+
+```sh
+zillib certify examples/aws-model-extension-with-icons.zc --lib libsets/aws-model | head -3
+```
+
+```text
+certificate: 25 facts, 18 from the database and 7 derived
+closure check: 12 rule instances examined
+certified: every fact is justified, and no rule derives a fact that is missing, so the facts are exactly those the program entails.
+```
+
+```sh
+zillib certify examples/aws-model-extension-with-icons.zc 2>&1 || echo "exit status $?"
+```
+
+```text
+line 12:1: unknown macro AWS_PROVIDER
+  USE AWS_PROVIDER(aws, amazon_web_services).
+exit status 2
+```
+
+All 18 rows of `spec/macro-extension-matrix.tsv` are certified this way, each with its library; `scripts/test.sh` checks them.
+
 ### A finding: the engine used to stop early on a long chain
 
 The first time this checker ran on a long chain it found a defect in the engine. The engine applies the rules in rounds, and it used to stop

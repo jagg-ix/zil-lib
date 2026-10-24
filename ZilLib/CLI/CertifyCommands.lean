@@ -4,7 +4,7 @@ import ZilLib.Model
 /-!
 # `zilLib certify`
 
-    zilLib certify MODEL.zc [TRACE.txt] [--fuel N] [--limit N]
+    zilLib certify MODEL.zc [TRACE.txt] [--lib PATH]... [--fuel N] [--limit N]
 
 Checks that the facts of a derivation certificate are exactly the facts the model entails. Without `TRACE.txt` the certificate is the
 core's own provenance trace of the model (the engine checked against an independent checker); with it, the certificate is a
@@ -12,7 +12,9 @@ core's own provenance trace of the model (the engine checked against an independ
 rounds the engine may use per stratum (by default `Zil.Engine.defaultFuel`; the engine fails if it needs more) and `--limit` the number
 of problems printed.
 
-The model is read as it is: expand the macros first (`zil expand ... --lib DIR`), as for `explain-query`.
+A model that uses macros from a library is read with that library: `--lib PATH` prepends the `.zc` files of a directory (sorted by name,
+as the core's `--lib DIR` reads them) or one `.zc` file, and may be repeated, in order. Without `--lib` the model is read as it is
+and has to define its macros itself. The certificate is then that of the expanded program, which is what the engine runs.
 
 Exit codes: 0 the certificate passes both checks, 1 it does not, 2 the model or the certificate cannot be read.
 -/
@@ -21,7 +23,7 @@ namespace ZilLib.CLI.CertifyCommands
 
 open ZilLib.Certify
 
-def usage : String := "zilLib certify MODEL.zc [TRACE.txt] [--fuel N] [--limit N]"
+def usage : String := "zilLib certify MODEL.zc [TRACE.txt] [--lib PATH]... [--fuel N] [--limit N]"
 
 private def number? (name : String) (args : List String) : Except String (Option Nat) :=
   match args.dropWhile (· != name) with
@@ -31,21 +33,34 @@ private def number? (name : String) (args : List String) : Except String (Option
   | [_] => throw s!"{name} needs a value"
   | [] => pure none
 
+/-- The value of every occurrence of the option `name`, in order. -/
+private def values (name : String) : List String → Except String (List String)
+  | [] => pure []
+  | argument :: rest =>
+      if argument == name then
+        match rest with
+        | value :: more => do pure (value :: (← values name more))
+        | [] => throw s!"{name} needs a value"
+      else values name rest
+
 /-- The positional arguments: everything that is not an option or the value of one. -/
 private def positional : List String → List String
   | [] => []
-  | "--fuel" :: _ :: rest | "--limit" :: _ :: rest => positional rest
+  | "--fuel" :: _ :: rest | "--limit" :: _ :: rest | "--lib" :: _ :: rest => positional rest
   | argument :: rest => if argument.startsWith "--" then positional rest else argument :: positional rest
 
 def run (args : List String) : IO UInt32 := do
   let (fuel, limit) ← match number? "--fuel" args, number? "--limit" args with
     | .ok fuel, .ok limit => pure (fuel.getD Zil.Engine.defaultFuel, limit.getD 20)
     | .error problem, _ | _, .error problem => IO.eprintln s!"{problem}\n{usage}"; return 2
+  let libraries ← match values "--lib" args with
+    | .ok paths => pure paths
+    | .error problem => IO.eprintln s!"{problem}\n{usage}"; return 2
   let (model, traceFile) ← match positional args with
     | [model] => pure (model, none)
     | [model, trace] => pure (model, some trace)
     | _ => IO.eprintln usage; return 2
-  let program ← match ← (ZilLib.loadProgram model).toBaseIO with
+  let program ← match ← (ZilLib.loadProgramWith libraries model).toBaseIO with
     | .ok program => pure program
     | .error error => IO.eprintln (toString error); return 2
   unless program.valid do
