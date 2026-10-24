@@ -621,52 +621,60 @@ certified: every fact is justified, and no rule derives a fact that is missing, 
 This is the result of a checker that is tested but not yet verified in Lean (docs/certifying-datalog.md, CERT-10).
 ```
 
-### A finding: the engine stops early on a long chain
+### A finding: the engine used to stop early on a long chain
 
-The engine applies the rules in rounds and stops after 64 rounds for each stratum, without saying so. A rule that follows a chain one step per
-round therefore misses everything beyond 64 steps. The facts are a chain of 70 edges and two rules that follow it:
+The first time this checker ran on a long chain it found a defect in the engine. The engine applies the rules in rounds, and it used to stop
+after 64 rounds for each stratum without saying so. A rule that follows a chain one step per round, which is the usual way to write
+reachability, dependency or access propagation, therefore missed everything past the 65th step, and `zil query-ci` still reported `pass`.
+It was fixed in zil-lean `cdec3f2`: the engine now continues until a round adds nothing, and fails if a bound that you give it runs out.
+
+`examples/certify/chain.zc` has 70 facts `n:n0#next@n:n1.` to `n:n69#next@n:n70.`, and one rule that follows them from `n0`:
 
 ```zil
-// Reachability along a chain: the facts are written elsewhere, as n:n0#next@n:n1. and so on.
-RULE base:
-IF ?a#next@?b
-THEN ?a#reaches@?b.
+n:n0#reaches@n:n1.
 
 RULE step:
-IF ?a#reaches@?b AND ?b#next@?c
-THEN ?a#reaches@?c.
+IF n:n0#reaches@?b AND ?b#next@?c
+THEN n:n0#reaches@?c.
 ```
 
+The report that the engine printed for this model before the fix is kept in `test/fixtures/certify/`. It has 135 of the 140 facts that follow.
+The checker finds the first rule instance whose head is missing:
+
 ```sh
-{ echo "MODULE chain."; for i in $(seq 0 69); do echo "n:n$i#next@n:n$((i + 1))."; done; cat examples/certify/reaches-rules.zc; } > /tmp/chain.zc
-zillib certify /tmp/chain.zc > /tmp/certify.txt || echo "exit status $?"
-cat /tmp/certify.txt
+zillib certify examples/certify/chain.zc test/fixtures/certify/chain.old-engine-trace.txt > /tmp/old.txt || echo "exit status $?"
+cat /tmp/old.txt
 ```
 
 ```text
 exit status 1
-certificate: 2540 facts, 70 from the database and 2470 derived
-closure check: 2475 rule instances examined
-NOT certified: 5 problem(s)
+certificate: 135 facts, 71 from the database and 64 derived
+closure check: 65 rule instances examined
+NOT certified: 1 problem(s)
   [not-closed] rule step derives n.n0#zil.reaches@n.n66, which is not in the certificate
-  [not-closed] rule step derives n.n1#zil.reaches@n.n67, which is not in the certificate
-  [not-closed] rule step derives n.n2#zil.reaches@n.n68, which is not in the certificate
-  [not-closed] rule step derives n.n3#zil.reaches@n.n69, which is not in the certificate
-  [not-closed] rule step derives n.n4#zil.reaches@n.n70, which is not in the certificate
 ```
 
-Of the 2555 facts that follow from the model, the engine derived 2540. The 15 it dropped are the pairs more than 65 steps apart, and the
-queries of `zil query-ci` leave them out as well. The checker finds the first rule instance whose head is missing, and the others follow. With
-enough rounds the same model is certified:
+The engine of today derives all of them, and the checker agrees:
 
 ```sh
-zillib certify /tmp/chain.zc --fuel 200 | head -3
+zillib certify examples/certify/chain.zc | head -3
 ```
 
 ```text
-certificate: 2555 facts, 70 from the database and 2485 derived
-closure check: 2485 rule instances examined
+certificate: 140 facts, 71 from the database and 69 derived
+closure check: 69 rule instances examined
 certified: every fact is justified, and no rule derives a fact that is missing, so the facts are exactly those the program entails.
+```
+
+A bound that is too small is now an error of the engine, and not a shorter answer:
+
+```sh
+zillib certify examples/certify/chain.zc --fuel 64 2>&1 || echo "exit status $?"
+```
+
+```text
+examples/certify/chain.zc: closure did not reach its fixpoint in stratum 0 within 64 rounds; the facts derived so far are not the closure
+exit status 2
 ```
 
 ### A certificate from a file
@@ -709,7 +717,8 @@ NOT certified: 1 problem(s)
 | `ZilLib/CLI/ApalacheCommands.lean` | the `zilLib apalache` commands |
 | `ZilLib/Certify/` | the certificate checker: `Check.lean` (soundness, closure, stratification) and `Text.lean` (reads a provenance report) |
 | `ZilLib/CLI/CertifyCommands.lean` | the `zilLib certify` command |
-| `examples/certify/` | the rules of the chain example |
+| `examples/certify/` | the chain model of the engine finding |
+| `test/fixtures/certify/` | the report that the engine printed for it before the fix |
 | `examples/tour/` | the four example models of the tour and the shell helper functions |
 | `scripts/test.sh` | the test suite (CI gate) |
 | `scripts/test-tour.sh` | runs every command in the tour and compares its output with this README |

@@ -1,0 +1,80 @@
+// A chain of 70 steps, and a rule that follows it from n0 one step in each round of the engine.
+MODULE chain.certify.
+n:n0#next@n:n1.
+n:n1#next@n:n2.
+n:n2#next@n:n3.
+n:n3#next@n:n4.
+n:n4#next@n:n5.
+n:n5#next@n:n6.
+n:n6#next@n:n7.
+n:n7#next@n:n8.
+n:n8#next@n:n9.
+n:n9#next@n:n10.
+n:n10#next@n:n11.
+n:n11#next@n:n12.
+n:n12#next@n:n13.
+n:n13#next@n:n14.
+n:n14#next@n:n15.
+n:n15#next@n:n16.
+n:n16#next@n:n17.
+n:n17#next@n:n18.
+n:n18#next@n:n19.
+n:n19#next@n:n20.
+n:n20#next@n:n21.
+n:n21#next@n:n22.
+n:n22#next@n:n23.
+n:n23#next@n:n24.
+n:n24#next@n:n25.
+n:n25#next@n:n26.
+n:n26#next@n:n27.
+n:n27#next@n:n28.
+n:n28#next@n:n29.
+n:n29#next@n:n30.
+n:n30#next@n:n31.
+n:n31#next@n:n32.
+n:n32#next@n:n33.
+n:n33#next@n:n34.
+n:n34#next@n:n35.
+n:n35#next@n:n36.
+n:n36#next@n:n37.
+n:n37#next@n:n38.
+n:n38#next@n:n39.
+n:n39#next@n:n40.
+n:n40#next@n:n41.
+n:n41#next@n:n42.
+n:n42#next@n:n43.
+n:n43#next@n:n44.
+n:n44#next@n:n45.
+n:n45#next@n:n46.
+n:n46#next@n:n47.
+n:n47#next@n:n48.
+n:n48#next@n:n49.
+n:n49#next@n:n50.
+n:n50#next@n:n51.
+n:n51#next@n:n52.
+n:n52#next@n:n53.
+n:n53#next@n:n54.
+n:n54#next@n:n55.
+n:n55#next@n:n56.
+n:n56#next@n:n57.
+n:n57#next@n:n58.
+n:n58#next@n:n59.
+n:n59#next@n:n60.
+n:n60#next@n:n61.
+n:n61#next@n:n62.
+n:n62#next@n:n63.
+n:n63#next@n:n64.
+n:n64#next@n:n65.
+n:n65#next@n:n66.
+n:n66#next@n:n67.
+n:n67#next@n:n68.
+n:n68#next@n:n69.
+n:n69#next@n:n70.
+n:n0#reaches@n:n1.
+
+RULE step:
+IF n:n0#reaches@?b AND ?b#next@?c
+THEN n:n0#reaches@?c.
+
+QUERY from_start:
+FIND ?b WHERE n:n0#reaches@?b.

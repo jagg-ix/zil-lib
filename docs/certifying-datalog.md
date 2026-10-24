@@ -74,25 +74,34 @@ tested on 18 expanded libraries (5270 facts), on the paper's example 3 and on el
 checker were each caught by the tests); that attributes behave as intended. Attributes follow the engine's rule, that a premise matches a fact that has at least its attributes; the
 checker restates that rule, so a change of the rule in the engine shows up as a disagreement.
 
-## A defect the closure check found
+## A defect the closure check found, and its fix
 
-`Zil.Engine` closes each stratum in at most 64 rounds (`fuel := 64`) and returns what it has when the rounds are used up, without saying
-so. A recursive rule that follows a chain by one step each round misses everything past the 64th step.
+`Zil.Engine` used to close each stratum in at most 64 rounds (`fuel := 64`) and return what it had when the rounds ran out, without saying
+so. A recursive rule that extends a path by one step each round, which is the usual way to write reachability, dependency or access
+propagation along a chain, then missed everything past the 65th step. (Groups nested with the `#member` userset syntax are not affected:
+the generated rule doubles the reach each round, so a depth of 70 takes about ten rounds.)
 
-* A chain of 100 `next` edges with the two rules of `examples/certify/reaches-rules.zc`: the closure has 4520 facts where 5150 follow.
-  The 630 missing facts are all the `reaches` pairs more than 65 steps apart.
-* `zil query-ci` reports `status pass`, and returns 65 nodes where 100 are reachable, for the query "everything reachable from n0".
-* `zilLib certify` reports `NOT certified` with the first rule instance whose head is missing.
+Measured before the fix, on a chain of 100 `next` edges with a base rule and a transitive rule:
 
-It affects every answer that follows a chain deeper than 65: nested groups, dependency paths, impact analysis. The same limit matters for
-the Apalache lowering (APL-13): the unrolling depth of a recursive rule has to come from the size of the domain, never from a constant.
+* the closure had 4520 facts where 5150 follow; the 630 missing facts are all the `reaches` pairs more than 65 steps apart;
+* `zil query-ci` reported `status pass`, and returned 65 nodes where 100 are reachable for "everything reachable from `n0`";
+* `zilLib certify` reported `NOT certified` with the first rule instance whose head was missing.
 
-A fix in the core should iterate to the fixpoint (the loop already stops early when a round adds nothing, so the bound only matters for
-programs that do not converge in the number of rounds given) and should fail, not truncate, if the bound is reached. It is not made here,
-because `zil-lean` is a separate repository (CERT-08).
+The formal core spec (section 6.5) defines the result of a stratum as the least fixpoint, so the code did not compute what the spec says. With
+negation the damage can go the other way: a lower stratum cut short leaves facts out, and a `NOT` over one of them then succeeds.
 
-A second, smaller finding: building the trace takes 12.8 s for the 4520 facts above; the provenance builder looks up every fact it adds in a
-list, among other scans. The checker needs 0.4 s for the same facts. The trace is quadratic in the number of facts (CERT-13).
+**Fixed in zil-lean `cdec3f2` (CERT-08).** The loops report whether they reached the fixpoint. `closureChecked`, `traceChecked` and what calls
+them (provenance, `query-ci`, authorization, impact, query governance, agent context) fail with `closure did not reach its fixpoint in
+stratum N within F rounds` instead of returning a partial closure. The default bound is `Zil.Engine.defaultFuel`, one million rounds; a
+round that adds nothing still ends the loop, so a large bound costs nothing. `Zil.Engine.closure`, which cannot return an error, still
+returns the facts so far when a caller's own bound runs out, and its comment says so. `Zil/Test/Fixpoint.lean` in zil-lean holds the
+regression guards (a chain of 70 steps, an access rule over 70 services); they fail on the previous engine.
+
+The report that the previous engine printed for `examples/certify/chain.zc` is kept in `test/fixtures/certify/`, and the checker still
+refuses it. That is the test that the checker would have caught the defect, and it keeps meaning something after the engine is fixed.
+
+A second, smaller finding is not fixed: building the trace takes 12.8 s for 4520 facts, because the provenance builder looks up every fact
+it adds in a list, among other scans. The checker needs 0.4 s for the same facts. The trace is quadratic in the number of facts (CERT-13).
 
 ## Targets
 
@@ -105,7 +114,7 @@ list, among other scans. The checker needs 0.4 s for the same facts. The trace i
 | CERT-05 | The proof graph stays small on the paper's example 3 (650 facts for a chain of 20; a tree has more than a million nodes) | done as a test |
 | CERT-06 | Fault injection: eleven kinds of faulty certificate are refused by name; five faults injected by hand into the checker were each caught by the tests (not repeated by the gate) | done 2026-10-23 |
 | CERT-07 | `zilLib certify` over the macro libraries as a test of the engine | done for the 18 expanded libraries; the model-substrate and the other libraries outside the matrix are not covered |
-| CERT-08 | The engine reaches the fixpoint or fails; no silent truncation (a change in `zil-lean`) | not started: needs the maintainer's word; the checker's test of the chain is ready to become a regression test there |
+| CERT-08 | The engine reaches the fixpoint or fails; no silent truncation (a change in `zil-lean`) | done 2026-10-23, zil-lean `cdec3f2`; the pin of this repository is there |
 | CERT-09 | Certify one query's answers, including a negative answer ("this fact is not entailed"), from the closure | not started |
 | CERT-10 | The semantics in Lean (ground programs, stable and perfect models) and a theorem that a passing check means the perfect model. Read `CertifyingDatalog` and its license before reusing any of it | not started |
 | CERT-11 | A JSON encoding of certificates like the paper's, so that a trace from Nemo or Soufflé can be checked against a ZIL model; relations are ternary here (`subject#relation@object`) with attributes | not started |

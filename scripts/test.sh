@@ -117,11 +117,11 @@ fi
 if [[ "$(lake exe zilLibCertifyTests 2>&1 | tee "$work/certify-tests.log" | tail -1)" =~ ^[0-9]+\ passed,\ 0\ failed$ ]]; then
   pass "certificate checker: soundness, closure, stratification, faults, the engine's fixpoint ($(tail -1 "$work/certify-tests.log"))"
 else fail "certificate checker"; grep '^FAIL' "$work/certify-tests.log" >&2 || tail -5 "$work/certify-tests.log" >&2; fi
-{ echo "MODULE chain."; for i in $(seq 0 69); do echo "n:n$i#next@n:n$((i + 1))."; done; cat examples/certify/reaches-rules.zc; } >"$work/chain.zc"
 exit_of 0 "certify: the engine's trace of the shop model is certified" lake exe zilLib certify examples/tour/01-blast-radius.zc
-exit_of 1 "certify: a chain longer than the engine's 64 rounds is not closed" lake exe zilLib certify "$work/chain.zc"
+exit_of 0 "certify: the engine's trace of a chain of 70 steps is certified (it stopped at 64 rounds before zil-lean cdec3f2)" lake exe zilLib certify examples/certify/chain.zc
+exit_of 1 "certify: the trace the engine printed before that fix is not closed" lake exe zilLib certify examples/certify/chain.zc test/fixtures/certify/chain.old-engine-trace.txt
 grep -q 'not-closed.*n66' "$work/command.out" && pass "certify: the missing fact is named" || fail "certify: the missing fact is not named"
-exit_of 0 "certify: the same chain with enough rounds is certified" lake exe zilLib certify "$work/chain.zc" --fuel 200
+exit_of 2 "certify: a bound of 64 rounds is an error of the engine, not a shorter trace" lake exe zilLib certify examples/certify/chain.zc --fuel 64
 exit_of 2 "certify: a model that does not exist" lake exe zilLib certify "$work/absent.zc"
 exit_of 2 "certify: a command line without a model" lake exe zilLib certify
 printf 'fact\t0\t0\trel\tnode:a\tr\tnode:b\t\n' >"$work/broken-trace.txt"

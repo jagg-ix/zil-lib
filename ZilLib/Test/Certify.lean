@@ -23,20 +23,15 @@ private def program (text : String) : IO Zil.Program := do
   IO.FS.removeDirAll directory
   pure loaded
 
-private def trace (program : Zil.Program) (fuel : Nat := 64) : IO Engine.Provenance.Trace := do
+private def trace (program : Zil.Program) (fuel : Nat := Zil.Engine.defaultFuel) : IO Engine.Provenance.Trace := do
   match Engine.Provenance.traceProgram program fuel with
   | .ok trace => pure trace
   | .error problem => throw (IO.userError problem)
 
-private def certificate (program : Zil.Program) (fuel : Nat := 64) : IO Certificate :=
+private def certificate (program : Zil.Program) (fuel : Nat := Zil.Engine.defaultFuel) : IO Certificate :=
   Certificate.ofTrace <$> trace program fuel
 
 private def kinds (report : Report) : List String := (report.problems.map (·.kind)).toList
-
-private def chain (n : Nat) : String :=
-  String.intercalate "\n" <|
-    ["MODULE chain."] ++ (List.range n).map (fun i => s!"n:n{i}#next@n:n{i + 1}.") ++
-    ["RULE base:", "IF ?a#next@?b", "THEN ?a#reaches@?b.", "RULE step:", "IF ?a#reaches@?b AND ?b#next@?c", "THEN ?a#reaches@?c.", ""]
 
 /-- The rules of the paper's example 3, whose proof trees are exponentially large, over a chain of `n` edges. -/
 private def exponential (n : Nat) : String :=
@@ -168,21 +163,26 @@ private def stratificationTests (t : Tally) : IO Unit := do
       | .error _ => false)
 
 private def engineTests (t : Tally) : IO Unit := do
-  -- the engine stops after 64 rounds without saying so; the closure check sees it. With 70 edges the facts at distance 66 to 70
-  -- (15 of them) are missing, and only those at distance 66 (5) have a rule instance whose premises are in the trace.
-  let long ← program (chain 70)
-  let truncated ← certificate long
-  let report := check long.facts long.allRules truncated
-  t.expect "a chain of 70 edges: the engine's default run is not closed" (!report.certified)
-  t.expect "the 5 rule instances whose heads were never derived are found" (report.problemCount == 5)
-  t.expect "the first missing fact is the one at distance 66"
-    (report.problems.any fun p => p.kind == "not-closed" && contains p.detail "n.n0#zil.reaches@n.n66")
-  t.expect "the engine's trace has 2540 facts where the closure has 2555" (truncated.size == 2540)
-  let complete ← certificate long (fuel := 200)
-  let full := check long.facts long.allRules complete
-  t.expect "with enough rounds the same chain is certified, with 2555 facts" (full.certified && complete.size == 2555)
-  let short ← program (chain 30)
-  t.expect "a chain of 30 edges is certified with the default run" (check short.facts short.allRules (← certificate short)).certified
+  -- the engine used to stop after 64 rounds without saying so (zil-lean before cdec3f2); it now reaches the fixpoint or fails
+  let long ← ZilLib.loadProgram "examples/certify/chain.zc"
+  let current ← certificate long
+  let report := check long.facts long.allRules current
+  t.expect "a chain of 70 steps: the engine's trace is certified, with 140 facts" (report.certified && current.size == 140)
+  t.expect "a bound of 64 rounds is an error and not a shorter trace"
+    (match Engine.Provenance.traceProgram long 64 with
+      | .error message => contains message "did not reach its fixpoint"
+      | .ok _ => false)
+  -- the report that the engine before the fix printed for the same model, kept as a fixture: 135 facts, the 66th step missing
+  match parseProvenance (← IO.FS.readFile "test/fixtures/certify/chain.old-engine-trace.txt") with
+  | .ok old =>
+      let oldReport := check long.facts long.allRules old
+      t.expect "the old engine's report has 135 facts where 140 follow" (old.size == 135)
+      t.expect "the old engine's report is not certified" (!oldReport.certified)
+      t.expect "the one rule instance whose head is missing is found, at distance 66" (oldReport.problemCount == 1 &&
+        oldReport.problems.any fun p => p.kind == "not-closed" && contains p.detail "n.n0#zil.reaches@n.n66")
+  | .error problem => t.expect "the old engine's report can be read" false problem
+  let short ← program "MODULE short.\nn:a#next@n:b.\nn:b#next@n:c.\nRULE base:\nIF ?x#next@?y\nTHEN ?x#reaches@?y.\nRULE step:\nIF ?x#reaches@?y AND ?y#next@?z\nTHEN ?x#reaches@?z.\n"
+  t.expect "a short chain is certified with the engine's defaults" (check short.facts short.allRules (← certificate short)).certified
 
 private def textTests (t : Tally) : IO Unit := do
   let blast ← ZilLib.loadProgram "examples/tour/01-blast-radius.zc"

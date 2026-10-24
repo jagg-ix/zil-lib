@@ -9,7 +9,8 @@ import ZilLib.Model
 Checks that the facts of a derivation certificate are exactly the facts the model entails. Without `TRACE.txt` the certificate is the
 core's own provenance trace of the model (the engine checked against an independent checker); with it, the certificate is a
 `ZIL-PROVENANCE/1` report, as `bin/zil trace` prints it, which may come from anywhere and is not trusted. `--fuel` is the number of
-rounds the engine may use per stratum (its default is 64) and `--limit` the number of problems printed.
+rounds the engine may use per stratum (by default `Zil.Engine.defaultFuel`; the engine fails if it needs more) and `--limit` the number
+of problems printed.
 
 The model is read as it is: expand the macros first (`zil expand ... --lib DIR`), as for `explain-query`.
 
@@ -38,7 +39,7 @@ private def positional : List String → List String
 
 def run (args : List String) : IO UInt32 := do
   let (fuel, limit) ← match number? "--fuel" args, number? "--limit" args with
-    | .ok fuel, .ok limit => pure (fuel.getD 64, limit.getD 20)
+    | .ok fuel, .ok limit => pure (fuel.getD Zil.Engine.defaultFuel, limit.getD 20)
     | .error problem, _ | _, .error problem => IO.eprintln s!"{problem}\n{usage}"; return 2
   let (model, traceFile) ← match positional args with
     | [model] => pure (model, none)

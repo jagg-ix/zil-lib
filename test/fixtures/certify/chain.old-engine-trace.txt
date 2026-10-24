@@ -1,0 +1,272 @@
+ZIL-PROVENANCE	1
+facts	135
+fact	0	0	rel	node:n.n0	zil.next	node:n.n1	
+origin	0	base
+fact	1	0	rel	node:n.n1	zil.next	node:n.n2	
+origin	1	base
+fact	2	0	rel	node:n.n2	zil.next	node:n.n3	
+origin	2	base
+fact	3	0	rel	node:n.n3	zil.next	node:n.n4	
+origin	3	base
+fact	4	0	rel	node:n.n4	zil.next	node:n.n5	
+origin	4	base
+fact	5	0	rel	node:n.n5	zil.next	node:n.n6	
+origin	5	base
+fact	6	0	rel	node:n.n6	zil.next	node:n.n7	
+origin	6	base
+fact	7	0	rel	node:n.n7	zil.next	node:n.n8	
+origin	7	base
+fact	8	0	rel	node:n.n8	zil.next	node:n.n9	
+origin	8	base
+fact	9	0	rel	node:n.n9	zil.next	node:n.n10	
+origin	9	base
+fact	10	0	rel	node:n.n10	zil.next	node:n.n11	
+origin	10	base
+fact	11	0	rel	node:n.n11	zil.next	node:n.n12	
+origin	11	base
+fact	12	0	rel	node:n.n12	zil.next	node:n.n13	
+origin	12	base
+fact	13	0	rel	node:n.n13	zil.next	node:n.n14	
+origin	13	base
+fact	14	0	rel	node:n.n14	zil.next	node:n.n15	
+origin	14	base
+fact	15	0	rel	node:n.n15	zil.next	node:n.n16	
+origin	15	base
+fact	16	0	rel	node:n.n16	zil.next	node:n.n17	
+origin	16	base
+fact	17	0	rel	node:n.n17	zil.next	node:n.n18	
+origin	17	base
+fact	18	0	rel	node:n.n18	zil.next	node:n.n19	
+origin	18	base
+fact	19	0	rel	node:n.n19	zil.next	node:n.n20	
+origin	19	base
+fact	20	0	rel	node:n.n20	zil.next	node:n.n21	
+origin	20	base
+fact	21	0	rel	node:n.n21	zil.next	node:n.n22	
+origin	21	base
+fact	22	0	rel	node:n.n22	zil.next	node:n.n23	
+origin	22	base
+fact	23	0	rel	node:n.n23	zil.next	node:n.n24	
+origin	23	base
+fact	24	0	rel	node:n.n24	zil.next	node:n.n25	
+origin	24	base
+fact	25	0	rel	node:n.n25	zil.next	node:n.n26	
+origin	25	base
+fact	26	0	rel	node:n.n26	zil.next	node:n.n27	
+origin	26	base
+fact	27	0	rel	node:n.n27	zil.next	node:n.n28	
+origin	27	base
+fact	28	0	rel	node:n.n28	zil.next	node:n.n29	
+origin	28	base
+fact	29	0	rel	node:n.n29	zil.next	node:n.n30	
+origin	29	base
+fact	30	0	rel	node:n.n30	zil.next	node:n.n31	
+origin	30	base
+fact	31	0	rel	node:n.n31	zil.next	node:n.n32	
+origin	31	base
+fact	32	0	rel	node:n.n32	zil.next	node:n.n33	
+origin	32	base
+fact	33	0	rel	node:n.n33	zil.next	node:n.n34	
+origin	33	base
+fact	34	0	rel	node:n.n34	zil.next	node:n.n35	
+origin	34	base
+fact	35	0	rel	node:n.n35	zil.next	node:n.n36	
+origin	35	base
+fact	36	0	rel	node:n.n36	zil.next	node:n.n37	
+origin	36	base
+fact	37	0	rel	node:n.n37	zil.next	node:n.n38	
+origin	37	base
+fact	38	0	rel	node:n.n38	zil.next	node:n.n39	
+origin	38	base
+fact	39	0	rel	node:n.n39	zil.next	node:n.n40	
+origin	39	base
+fact	40	0	rel	node:n.n40	zil.next	node:n.n41	
+origin	40	base
+fact	41	0	rel	node:n.n41	zil.next	node:n.n42	
+origin	41	base
+fact	42	0	rel	node:n.n42	zil.next	node:n.n43	
+origin	42	base
+fact	43	0	rel	node:n.n43	zil.next	node:n.n44	
+origin	43	base
+fact	44	0	rel	node:n.n44	zil.next	node:n.n45	
+origin	44	base
+fact	45	0	rel	node:n.n45	zil.next	node:n.n46	
+origin	45	base
+fact	46	0	rel	node:n.n46	zil.next	node:n.n47	
+origin	46	base
+fact	47	0	rel	node:n.n47	zil.next	node:n.n48	
+origin	47	base
+fact	48	0	rel	node:n.n48	zil.next	node:n.n49	
+origin	48	base
+fact	49	0	rel	node:n.n49	zil.next	node:n.n50	
+origin	49	base
+fact	50	0	rel	node:n.n50	zil.next	node:n.n51	
+origin	50	base
+fact	51	0	rel	node:n.n51	zil.next	node:n.n52	
+origin	51	base
+fact	52	0	rel	node:n.n52	zil.next	node:n.n53	
+origin	52	base
+fact	53	0	rel	node:n.n53	zil.next	node:n.n54	
+origin	53	base
+fact	54	0	rel	node:n.n54	zil.next	node:n.n55	
+origin	54	base
+fact	55	0	rel	node:n.n55	zil.next	node:n.n56	
+origin	55	base
+fact	56	0	rel	node:n.n56	zil.next	node:n.n57	
+origin	56	base
+fact	57	0	rel	node:n.n57	zil.next	node:n.n58	
+origin	57	base
+fact	58	0	rel	node:n.n58	zil.next	node:n.n59	
+origin	58	base
+fact	59	0	rel	node:n.n59	zil.next	node:n.n60	
+origin	59	base
+fact	60	0	rel	node:n.n60	zil.next	node:n.n61	
+origin	60	base
+fact	61	0	rel	node:n.n61	zil.next	node:n.n62	
+origin	61	base
+fact	62	0	rel	node:n.n62	zil.next	node:n.n63	
+origin	62	base
+fact	63	0	rel	node:n.n63	zil.next	node:n.n64	
+origin	63	base
+fact	64	0	rel	node:n.n64	zil.next	node:n.n65	
+origin	64	base
+fact	65	0	rel	node:n.n65	zil.next	node:n.n66	
+origin	65	base
+fact	66	0	rel	node:n.n66	zil.next	node:n.n67	
+origin	66	base
+fact	67	0	rel	node:n.n67	zil.next	node:n.n68	
+origin	67	base
+fact	68	0	rel	node:n.n68	zil.next	node:n.n69	
+origin	68	base
+fact	69	0	rel	node:n.n69	zil.next	node:n.n70	
+origin	69	base
+fact	70	0	rel	node:n.n0	zil.reaches	node:n.n1	
+origin	70	base
+fact	71	0	rel	node:n.n0	zil.reaches	node:n.n2	
+origin	71	rule	step	70,1		b=n.n1,c=n.n2
+fact	72	0	rel	node:n.n0	zil.reaches	node:n.n3	
+origin	72	rule	step	71,2		b=n.n2,c=n.n3
+fact	73	0	rel	node:n.n0	zil.reaches	node:n.n4	
+origin	73	rule	step	72,3		b=n.n3,c=n.n4
+fact	74	0	rel	node:n.n0	zil.reaches	node:n.n5	
+origin	74	rule	step	73,4		b=n.n4,c=n.n5
+fact	75	0	rel	node:n.n0	zil.reaches	node:n.n6	
+origin	75	rule	step	74,5		b=n.n5,c=n.n6
+fact	76	0	rel	node:n.n0	zil.reaches	node:n.n7	
+origin	76	rule	step	75,6		b=n.n6,c=n.n7
+fact	77	0	rel	node:n.n0	zil.reaches	node:n.n8	
+origin	77	rule	step	76,7		b=n.n7,c=n.n8
+fact	78	0	rel	node:n.n0	zil.reaches	node:n.n9	
+origin	78	rule	step	77,8		b=n.n8,c=n.n9
+fact	79	0	rel	node:n.n0	zil.reaches	node:n.n10	
+origin	79	rule	step	78,9		b=n.n9,c=n.n10
+fact	80	0	rel	node:n.n0	zil.reaches	node:n.n11	
+origin	80	rule	step	79,10		b=n.n10,c=n.n11
+fact	81	0	rel	node:n.n0	zil.reaches	node:n.n12	
+origin	81	rule	step	80,11		b=n.n11,c=n.n12
+fact	82	0	rel	node:n.n0	zil.reaches	node:n.n13	
+origin	82	rule	step	81,12		b=n.n12,c=n.n13
+fact	83	0	rel	node:n.n0	zil.reaches	node:n.n14	
+origin	83	rule	step	82,13		b=n.n13,c=n.n14
+fact	84	0	rel	node:n.n0	zil.reaches	node:n.n15	
+origin	84	rule	step	83,14		b=n.n14,c=n.n15
+fact	85	0	rel	node:n.n0	zil.reaches	node:n.n16	
+origin	85	rule	step	84,15		b=n.n15,c=n.n16
+fact	86	0	rel	node:n.n0	zil.reaches	node:n.n17	
+origin	86	rule	step	85,16		b=n.n16,c=n.n17
+fact	87	0	rel	node:n.n0	zil.reaches	node:n.n18	
+origin	87	rule	step	86,17		b=n.n17,c=n.n18
+fact	88	0	rel	node:n.n0	zil.reaches	node:n.n19	
+origin	88	rule	step	87,18		b=n.n18,c=n.n19
+fact	89	0	rel	node:n.n0	zil.reaches	node:n.n20	
+origin	89	rule	step	88,19		b=n.n19,c=n.n20
+fact	90	0	rel	node:n.n0	zil.reaches	node:n.n21	
+origin	90	rule	step	89,20		b=n.n20,c=n.n21
+fact	91	0	rel	node:n.n0	zil.reaches	node:n.n22	
+origin	91	rule	step	90,21		b=n.n21,c=n.n22
+fact	92	0	rel	node:n.n0	zil.reaches	node:n.n23	
+origin	92	rule	step	91,22		b=n.n22,c=n.n23
+fact	93	0	rel	node:n.n0	zil.reaches	node:n.n24	
+origin	93	rule	step	92,23		b=n.n23,c=n.n24
+fact	94	0	rel	node:n.n0	zil.reaches	node:n.n25	
+origin	94	rule	step	93,24		b=n.n24,c=n.n25
+fact	95	0	rel	node:n.n0	zil.reaches	node:n.n26	
+origin	95	rule	step	94,25		b=n.n25,c=n.n26
+fact	96	0	rel	node:n.n0	zil.reaches	node:n.n27	
+origin	96	rule	step	95,26		b=n.n26,c=n.n27
+fact	97	0	rel	node:n.n0	zil.reaches	node:n.n28	
+origin	97	rule	step	96,27		b=n.n27,c=n.n28
+fact	98	0	rel	node:n.n0	zil.reaches	node:n.n29	
+origin	98	rule	step	97,28		b=n.n28,c=n.n29
+fact	99	0	rel	node:n.n0	zil.reaches	node:n.n30	
+origin	99	rule	step	98,29		b=n.n29,c=n.n30
+fact	100	0	rel	node:n.n0	zil.reaches	node:n.n31	
+origin	100	rule	step	99,30		b=n.n30,c=n.n31
+fact	101	0	rel	node:n.n0	zil.reaches	node:n.n32	
+origin	101	rule	step	100,31		b=n.n31,c=n.n32
+fact	102	0	rel	node:n.n0	zil.reaches	node:n.n33	
+origin	102	rule	step	101,32		b=n.n32,c=n.n33
+fact	103	0	rel	node:n.n0	zil.reaches	node:n.n34	
+origin	103	rule	step	102,33		b=n.n33,c=n.n34
+fact	104	0	rel	node:n.n0	zil.reaches	node:n.n35	
+origin	104	rule	step	103,34		b=n.n34,c=n.n35
+fact	105	0	rel	node:n.n0	zil.reaches	node:n.n36	
+origin	105	rule	step	104,35		b=n.n35,c=n.n36
+fact	106	0	rel	node:n.n0	zil.reaches	node:n.n37	
+origin	106	rule	step	105,36		b=n.n36,c=n.n37
+fact	107	0	rel	node:n.n0	zil.reaches	node:n.n38	
+origin	107	rule	step	106,37		b=n.n37,c=n.n38
+fact	108	0	rel	node:n.n0	zil.reaches	node:n.n39	
+origin	108	rule	step	107,38		b=n.n38,c=n.n39
+fact	109	0	rel	node:n.n0	zil.reaches	node:n.n40	
+origin	109	rule	step	108,39		b=n.n39,c=n.n40
+fact	110	0	rel	node:n.n0	zil.reaches	node:n.n41	
+origin	110	rule	step	109,40		b=n.n40,c=n.n41
+fact	111	0	rel	node:n.n0	zil.reaches	node:n.n42	
+origin	111	rule	step	110,41		b=n.n41,c=n.n42
+fact	112	0	rel	node:n.n0	zil.reaches	node:n.n43	
+origin	112	rule	step	111,42		b=n.n42,c=n.n43
+fact	113	0	rel	node:n.n0	zil.reaches	node:n.n44	
+origin	113	rule	step	112,43		b=n.n43,c=n.n44
+fact	114	0	rel	node:n.n0	zil.reaches	node:n.n45	
+origin	114	rule	step	113,44		b=n.n44,c=n.n45
+fact	115	0	rel	node:n.n0	zil.reaches	node:n.n46	
+origin	115	rule	step	114,45		b=n.n45,c=n.n46
+fact	116	0	rel	node:n.n0	zil.reaches	node:n.n47	
+origin	116	rule	step	115,46		b=n.n46,c=n.n47
+fact	117	0	rel	node:n.n0	zil.reaches	node:n.n48	
+origin	117	rule	step	116,47		b=n.n47,c=n.n48
+fact	118	0	rel	node:n.n0	zil.reaches	node:n.n49	
+origin	118	rule	step	117,48		b=n.n48,c=n.n49
+fact	119	0	rel	node:n.n0	zil.reaches	node:n.n50	
+origin	119	rule	step	118,49		b=n.n49,c=n.n50
+fact	120	0	rel	node:n.n0	zil.reaches	node:n.n51	
+origin	120	rule	step	119,50		b=n.n50,c=n.n51
+fact	121	0	rel	node:n.n0	zil.reaches	node:n.n52	
+origin	121	rule	step	120,51		b=n.n51,c=n.n52
+fact	122	0	rel	node:n.n0	zil.reaches	node:n.n53	
+origin	122	rule	step	121,52		b=n.n52,c=n.n53
+fact	123	0	rel	node:n.n0	zil.reaches	node:n.n54	
+origin	123	rule	step	122,53		b=n.n53,c=n.n54
+fact	124	0	rel	node:n.n0	zil.reaches	node:n.n55	
+origin	124	rule	step	123,54		b=n.n54,c=n.n55
+fact	125	0	rel	node:n.n0	zil.reaches	node:n.n56	
+origin	125	rule	step	124,55		b=n.n55,c=n.n56
+fact	126	0	rel	node:n.n0	zil.reaches	node:n.n57	
+origin	126	rule	step	125,56		b=n.n56,c=n.n57
+fact	127	0	rel	node:n.n0	zil.reaches	node:n.n58	
+origin	127	rule	step	126,57		b=n.n57,c=n.n58
+fact	128	0	rel	node:n.n0	zil.reaches	node:n.n59	
+origin	128	rule	step	127,58		b=n.n58,c=n.n59
+fact	129	0	rel	node:n.n0	zil.reaches	node:n.n60	
+origin	129	rule	step	128,59		b=n.n59,c=n.n60
+fact	130	0	rel	node:n.n0	zil.reaches	node:n.n61	
+origin	130	rule	step	129,60		b=n.n60,c=n.n61
+fact	131	0	rel	node:n.n0	zil.reaches	node:n.n62	
+origin	131	rule	step	130,61		b=n.n61,c=n.n62
+fact	132	0	rel	node:n.n0	zil.reaches	node:n.n63	
+origin	132	rule	step	131,62		b=n.n62,c=n.n63
+fact	133	0	rel	node:n.n0	zil.reaches	node:n.n64	
+origin	133	rule	step	132,63		b=n.n63,c=n.n64
+fact	134	0	rel	node:n.n0	zil.reaches	node:n.n65	
+origin	134	rule	step	133,64		b=n.n64,c=n.n65
