@@ -34,7 +34,7 @@ namespace ZilLib.CLI.CertifyCommands
 
 open ZilLib.Certify
 
-def usage : String := "zilLib certify MODEL.zc [TRACE.txt] [--lib PATH]... [--fuel N] [--limit N] [--verified] [--query NAME]"
+def usage : String := "zilLib certify MODEL.zc [TRACE.txt|TRACE.json] [--lib PATH]... [--fuel N] [--limit N] [--verified] [--query NAME] [--json [OUT.json]]"
 
 private def number? (name : String) (args : List String) : Except String (Option Nat) :=
   match args.dropWhile (· != name) with
@@ -64,6 +64,7 @@ private def value? (name : String) (args : List String) : Option String :=
 private def positional : List String → List String
   | [] => []
   | "--fuel" :: _ :: rest | "--limit" :: _ :: rest | "--lib" :: _ :: rest | "--query" :: _ :: rest => positional rest
+  | "--json" :: val :: rest => if val.startsWith "--" then positional (val :: rest) else positional rest
   | argument :: rest => if argument.startsWith "--" then positional rest else argument :: positional rest
 
 def run (args : List String) : IO UInt32 := do
@@ -88,13 +89,27 @@ def run (args : List String) : IO UInt32 := do
         match ← (IO.FS.readFile file).toBaseIO with
         | .error error => IO.eprintln (toString error); return 2
         | .ok text =>
-            match parseProvenance text with
+            let parsed :=
+              if text.trimAscii.startsWith "{" || file.endsWith ".json" then
+                parseCertificateJson text
+              else
+                parseProvenance text
+            match parsed with
             | .ok certificate => pure certificate
             | .error problem => IO.eprintln s!"{file}: {problem}"; return 2
     | none =>
         match Zil.Engine.Provenance.traceProgram program fuel with
         | .ok trace => pure (Certificate.ofTrace trace)
         | .error problem => IO.eprintln s!"{model}: {problem}"; return 2
+  if args.contains "--json" then
+    match value? "--json" args with
+    | some out =>
+        if out.startsWith "--" then
+          IO.print (renderCertificateJson certificate)
+        else
+          IO.FS.writeFile out (renderCertificateJson certificate)
+    | none =>
+        IO.print (renderCertificateJson certificate)
   let report := check program.facts program.allRules certificate limit
   IO.println s!"certificate: {report.facts} facts, {report.database} from the database and {report.derived} derived"
   IO.println s!"closure check: {report.instances} rule instances examined"

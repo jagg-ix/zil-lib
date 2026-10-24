@@ -155,7 +155,7 @@ table) and `docs/move-libsets.md` (the LIB table) are updated in the same change
 | 3 | APL-05 (= LIB-14), APL-30 | the vocabulary for saying what to check, then the first strategic result (S1) | S1 as the table says: the seeded flaw is found at N ≤ 3 and replayed |
 | 4 | APL-31, APL-32, APL-33 | operations, temporal governance (S2), non-interference (S3) | S2 and S3 as the table says |
 | 5 | APL-40, APL-42, APL-43, APL-44, APL-45, APL-46 | extensions, each on top of the results above | each as the table says |
-| C | CERT-11, CERT-17 to CERT-21 | the certificate side; independent of batches 1 to 5, so take one when a batch is blocked | each as the CERT table says |
+| C | CERT-11, CERT-17 to CERT-21 | the certificate side; independent of batches 1 to 5, so take one when a batch is blocked | each as the CERT table says; CERT-11 done 2026-10-24 |
 | L | LIB-13, LIB-15 | one decision, then the move | `lib/` is decided and the runner exists once |
 
 Waits for the maintainer, not for a helper: LIB-10 (a project that pins the core also pins this repository; the project is not in this

@@ -298,6 +298,86 @@ private def textTests (t : Tally) : IO Unit := do
   refuses "an origin row that is not understood is refused" "fact\t0\t0\trel\tnode:a\tr\tnode:b\t\norigin\t0\tmagic\n" "not understood"
   refuses "a premise that is not a number is refused" "fact\t0\t0\trel\tnode:a\tr\tnode:b\t\norigin\t0\trule\tx\ta\t\t\n" "not a fact number"
 
+private def jsonTests (t : Tally) : IO Unit := do
+  let blast ← ZilLib.loadProgram "examples/tour/01-blast-radius.zc"
+  let good ← certificate blast
+  let json := renderCertificateJson good
+  -- 1. Deterministic byte emission
+  let json2 := renderCertificateJson good
+  t.expect "JSON certificate emission is byte-deterministic" (json == json2)
+  -- 2. Round-trip through JSON reader
+  match parseCertificateJson json with
+  | .error problem => t.expect "JSON certificate reads back" false problem
+  | .ok parsed =>
+      t.expect "read-back JSON certificate has the same node count" (parsed.size == good.size)
+      let identical := (List.range good.size).all fun i =>
+        parsed[i]!.fact.semanticallyEqual good[i]!.fact &&
+        parsed[i]!.rule == good[i]!.rule &&
+        parsed[i]!.premises == good[i]!.premises
+      t.expect "read-back JSON certificate preserves facts, rules and premises" identical
+      let report := check blast.facts blast.allRules parsed
+      t.expect "read-back JSON certificate is certified" report.certified
+      t.expect "re-serialized JSON certificate matches original bytes" (renderCertificateJson parsed == json)
+  -- 3. Refusal of eleven faults by name on JSON certificates
+  let derived := (List.range good.size).filter fun i => good[i]!.rule.isSome
+  let some firstDerived := derived.head? | t.expect "the tour certificate has derived facts" false; return
+  let lastIndex := good.size - 1
+  let judgeJson (cert : Certificate) : Report :=
+    match parseCertificateJson (renderCertificateJson cert) with
+    | .ok parsed => check blast.facts blast.allRules parsed
+    | .error problem => { facts := 0, database := 0, derived := 0, instances := 0, problems := #[{ kind := "parse-error", detail := problem }], problemCount := 1 }
+  -- Fault 1: order
+  let selfPremise := good.set! firstDerived { good[firstDerived]! with premises := #[firstDerived] }
+  t.expect "JSON: a node that uses itself is refused as out of order" ((kinds (judgeJson selfPremise)).contains "order")
+  -- Fault 2: unjustified
+  let wrongFact := good.set! firstDerived { good[firstDerived]! with fact := good[0]!.fact }
+  t.expect "JSON: a derived fact that is not the head of the rule instance is refused" ((kinds (judgeJson wrongFact)).contains "unjustified")
+  -- Fault 3: no-rule
+  let wrongRule := good.set! firstDerived { good[firstDerived]! with rule := some "nonexistent_rule" }
+  t.expect "JSON: a rule the program does not have is refused" ((kinds (judgeJson wrongRule)).contains "no-rule")
+  -- Fault 4: unsupported
+  let invented := good.push { fact := fact "service:ghost" "calls" "service:web" }
+  t.expect "JSON: a database fact that is not in the database is refused" ((kinds (judgeJson invented)).contains "unsupported")
+  -- Fault 5: unjustified (negative premise)
+  let forbidden := good.push { fact := fact "service.payments" "zil.hasFallback" "value.true" }
+  let forbiddenReport := judgeJson forbidden
+  t.expect "JSON: a fact that a negative premise forbids, put in the set, is refused"
+    (forbiddenReport.problems.any fun p => p.kind == "unjustified" && contains p.detail "negative premise")
+  -- Fault 6: not-closed
+  let missingLast := good.pop
+  let missingReport := judgeJson missingLast
+  t.expect "JSON: a derived fact that is left out is found by the closure check" ((kinds missingReport).contains "not-closed")
+  t.expect "JSON: the closure check names the missing fact" (missingReport.problems.any fun p => contains p.detail (render good[lastIndex]!.fact))
+  -- Fault 7: database-missing
+  let extraFact := fact "service:extra" "calls" "service:web"
+  let parsedGood := match parseCertificateJson json with | .ok c => c | .error _ => good
+  t.expect "JSON: a database fact that the certificate lacks is found"
+    ((kinds (check (blast.facts.push extraFact) blast.allRules parsedGood)).contains "database-missing")
+  -- Fault 8: unjustified (premise order)
+  let twoPremises := (List.range good.size).filter fun i => good[i]!.premises.size == 2 && good[i]!.premises[0]! != good[i]!.premises[1]!
+  match twoPremises.head? with
+  | some i =>
+      let swapped := good.set! i { good[i]! with premises := #[good[i]!.premises[1]!, good[i]!.premises[0]!] }
+      t.expect "JSON: premises in reversed order are refused" ((kinds (judgeJson swapped)).contains "unjustified")
+  | none => pure ()
+  -- Fault 9: duplicate
+  t.expect "JSON: a fact that appears twice is refused" ((kinds (judgeJson (good.push good[0]!))).contains "duplicate")
+  -- Fault 10: not-ground
+  let notGround := good.push { fact := .mk' (.variable `x) `calls (.ground `a) }
+  t.expect "JSON: a fact with a variable is refused" ((kinds (judgeJson notGround)).contains "not-ground")
+  -- Fault 11: malformed
+  let malformed := good.set! 0 { good[0]! with premises := #[1] }
+  t.expect "JSON: a database fact that names premises is refused" ((kinds (judgeJson malformed)).contains "malformed")
+  -- 4. Syntax and structural refusals of JSON reader
+  let refusesJson (name text expected : String) : IO Unit :=
+    match parseCertificateJson text with
+    | .ok _ => t.expect name false "it was accepted"
+    | .error problem => t.expect name (contains problem expected) problem
+  refusesJson "JSON missing format is refused" "{\"version\": \"1.0\", \"nodes\": []}" "missing 'format'"
+  refusesJson "JSON unsupported format is refused" "{\"format\": \"OTHER/1\", \"version\": \"1.0\", \"nodes\": []}" "unsupported certificate format"
+  refusesJson "JSON missing nodes is refused" "{\"format\": \"ZIL-CERTIFICATE/1\", \"version\": \"1.0\"}" "missing 'nodes'"
+  refusesJson "JSON node index mismatch is refused" "{\"format\": \"ZIL-CERTIFICATE/1\", \"version\": \"1.0\", \"nodes\": [{\"index\": 3, \"fact\": {\"subject\": \"a\", \"relation\": \"r\", \"object\": \"b\"}}]}" "expected node index 0"
+
 /-- The lines of the Lean command `zil_fact` are read as the `.zc` facts they mean, and nothing else is read as one. -/
 private def leanFactTests (t : Tally) : IO Unit := do
   let line (text : String) : Option String := match ZilLib.LeanFacts.line? text with | .ok fact => fact | .error _ => some "error"
@@ -346,6 +426,8 @@ def run (differential : Option (Nat × Nat) := none) : IO Bool := do
   faultTests t
   engineTests t
   textTests t
+  jsonTests t
   t.finish
 
 end ZilLib.Test.Certify
+

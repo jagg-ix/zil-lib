@@ -126,6 +126,11 @@ exit_of 2 "certify: a model that does not exist" lake exe zilLib certify "$work/
 exit_of 2 "certify: a command line without a model" lake exe zilLib certify
 printf 'fact\t0\t0\trel\tnode:a\tr\tnode:b\t\n' >"$work/broken-trace.txt"
 exit_of 2 "certify: a report that cannot be read" lake exe zilLib certify examples/tour/01-blast-radius.zc "$work/broken-trace.txt"
+exit_of 0 "certify: write a certificate as JSON" lake exe zilLib certify examples/tour/01-blast-radius.zc --json "$work/tour.cert.json"
+exit_of 0 "certify: read back and verify the JSON certificate" lake exe zilLib certify examples/tour/01-blast-radius.zc "$work/tour.cert.json"
+lake exe zilLib certify examples/tour/01-blast-radius.zc --json "$work/tour2.cert.json" >/dev/null 2>&1
+cmp -s "$work/tour.cert.json" "$work/tour2.cert.json" && pass "certify: the JSON certificate is byte-deterministic" \
+  || fail "certify: the JSON certificate is not byte-deterministic"
 # a model is read with the macro libraries named by --lib, as the core's expand reads them
 rows=0; unsound=""
 while IFS=$'\t' read -r name library model; do
