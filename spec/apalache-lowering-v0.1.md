@@ -1,15 +1,18 @@
-# ZIL to Apalache Lowering Contract v0.1
+# ZIL to Apalache & Transition System Lowering Contract v0.1
 
-This contract specifies how ZIL (Zil Intermediate Language) programs, queries, and administrative operations are translated into typed TLA+ intermediate representation (ADR-005, ADR-002) for bounded model checking and symbolic analysis with Apalache.
+**Status:** Drafted, awaiting maintainer acceptance (2026-10-24).
+
+This contract specifies how ZIL (Zil Intermediate Language) programs, queries, and administrative operations are translated into the semantic transition-system layer (`TSModule`, specified in `spec/transition-system-v0.1.md`) and typed TLA+ intermediate representation (ADR-005, ADR-002) for bounded model checking and symbolic analysis with Apalache and SMT-LIB 2 / Z3.
 
 It answers the architectural and semantic questions required before typed IR emission (APL-10), facts lowering (APL-12), and rules lowering (APL-13) are implemented.
 
 ## 1. Principles and Boundary
 
-1. **Lean is the reference oracle:** Apalache is an external verification and bug-finding tool. If Apalache reports "no violation within bound" and Lean's evaluator finds a violation on a concrete instance, the lowering is defective. Apalache results are classified as `externally-attested`, never `kernel-backed`.
+1. **Lean is the reference oracle:** Apalache and SMT solvers are external verification and bug-finding tools. The authoritative ground-truth reference is Lean's verified evaluator `Zil.Datalog.deriveProgramChecked` in `zil-lean` (which carries kernel-level soundness proofs), not the fast unverified engine (`Zil.Engine.closure`). If an external tool reports "no violation within bound" and `deriveProgramChecked` derives a violation on a concrete instance, the lowering or solver is defective. External solver results are classified as `externally-attested`, never `kernel-backed`.
 2. **Explicit bounds on every claim:** Every check result is bounded by domain size $N$, unrolling depth $d$, and execution steps $k$. Passing within bound is recorded as *checked within bound*, never *proved*.
 3. **Fail-closed execution:** An inconclusive outcome (timeout, out of memory, or tool error) is reported as `inconclusive-timeout` or `tool-error`, never as a pass.
 4. **Zero language pollution:** The core ZIL syntax, parsers, and declarations are untouched. All check vocabulary (bounds, operations, invariant queries) is introduced through macro libraries (`libsets/`) expanding to standard ZIL tuples, rules, and queries.
+5. **Lowering Target is `TSModule` (TS-05):** The primary target of ZIL lowering is the semantic transition system AST `TSModule` (specified in `spec/transition-system-v0.1.md`). Both Apalache (via typed JSON IR / APL-10) and SMT-LIB 2 / Z3 (TS-03) are backends consuming `TSModule`.
 
 ## 2. Sort Scheme
 
@@ -99,11 +102,33 @@ Every safe ZIL Datalog rule `head :- p1, p2, ...` lowers to a set comprehension 
   { <<s, u>> \in Nodes \X Nodes : \E o \in Nodes : <<s, o>> \in rel_r /\ <<o, u>> \in rel_u }
   ```
 
-### 4.5 Attributes and Pattern Matching
-- In ZIL, attributes on facts (`[key=val]`) refine facts.
-- A rule premise matching attributes (`IF ?s#r@?o [k=1]`) lowers to record attribute filtering:
-  `\E rec \in rel_r : rec.sub = s /\ rec.obj = o /\ rec.k = 1`
-- Variable bindings in attributes (e.g. `[k=?v]`) bind `v` in the existential quantifier of the rule step.
+### 4.5 Attributes, Heterogeneous Schemas, and Pattern Matching
+
+#### 4.5.1 Attribute Representation: Optional Fields with Presence Flags
+In ZIL:
+- Relations do not enforce rigid record schemas. Different ground facts of the same relation `r` may carry different subsets of attribute keys (e.g., fact 1 has `[k1=1]`, fact 2 has `[k2="alpha"]`, and fact 3 has `[k1=2, k2="beta"]`).
+- Rule premises match an arbitrary **subset** of a fact's attributes (`IF ?s#r@?o [k1=1]` matches any fact of `r` with `k1=1`, regardless of whether `k2` is present or absent).
+
+**Chosen Representation:**
+For each relation `r`, the lowering inspects the program to collect the union of all attribute keys $K(r) = \{k_1, \dots, k_m\}$ appearing across all facts and rule premises of `r`. In `TSModule` / Apalache, `r` is typed as a set of records with explicit boolean **presence flags**:
+```tla
+VARIABLE
+  \* @type: Set([sub: NODE, obj: NODE, has_k1: Bool, val_k1: Int, has_k2: Bool, val_k2: Str]);
+  rel_r
+```
+
+**Justification:**
+1. **Preserves Fact Identity & Atomicity:** The alternative approach—partitioning a fact into one set per attribute key (`rel_r_sub_obj`, `rel_r_k1`, `rel_r_k2`)—destroys fact atomicity and requires synthetic tuple surrogate keys to join attributes back together. Record embedding preserves the 1-to-1 correspondence with database facts.
+2. **Subset Pattern Matching:** A premise matching attribute subset `[k1=v1]` compiles directly to:
+   $$\exists rec \in rel\_r : rec.sub = s \land rec.obj = o \land rec.has\_k1 = \text{TRUE} \land rec.val\_k1 = v1$$
+   Attribute keys not mentioned in the pattern (e.g. `k2`) are ignored.
+3. **Absence Representation:** A fact lacking key $k_i$ is emitted with `has_k_i = FALSE` and a default sentinel value for `val_k_i`.
+
+#### 4.5.2 Variable Bindings in Attributes (`[k=?v]`) and Refusal Policy
+In ZIL attribute patterns:
+- The fast execution engine (`Zil.Engine`) binds variables in attribute patterns only when the value is a node identifier (`Node`).
+- The verified Lean-embedded evaluator (`ZilLib/Certify/Verified.lean`, `literalBehindVariable?`) allows binding to any literal value (e.g. integers, strings).
+- **Policy:** The final language design decision on whether attribute variables may bind to non-node literals remains open awaiting maintainer resolution. To guarantee that lowered programs never diverge between the fast engine and the verified reference, the lowering follows a **fail-closed refusal**: any rule or query where `[k=?v]` binds to a non-node literal is refused with an explicit diagnostic (`attribute-variable-non-node-refusal`) until the maintainer decides. Rules binding `?v` to a node (`Node`) are accepted.
 
 ## 5. Closure Depth Bound
 
@@ -160,9 +185,9 @@ In Datalog evaluation, recursive derivation proceeds until a fixpoint is reached
 - **Decision:** Use a single uninterpreted sort `NODE` for all entities in v0.1, with an extension mechanism for multi-sort signatures in APL-05.
 - **Reason:** Keeps baseline ZIL programs compatible without requiring upfront type declarations in the source language, while allowing SMT domain partitioning when explicit signatures are provided.
 
-### Question 2: Relations as State
-- **Decision:** One set variable per relation (`VARIABLE rel_r`), with attribute records inside the set.
-- **Reason:** Maximizes SMT solver performance by isolating relation constraints, avoiding heterogeneous tuple union types, and allowing per-relation typing in Apalache.
+### Question 2: Relations as State and Attribute Schemas
+- **Decision:** One set variable per relation (`VARIABLE rel_r`), with attribute records inside the set using boolean presence flags (`has_attr`) and values (`val_attr`).
+- **Reason:** Maximizes SMT solver performance by isolating relation constraints. Presence flags allow individual facts of the same relation to have differing subsets of attributes without destroying fact atomicity or requiring synthetic tuple IDs.
 
 ### Question 3: Closure Depth Bound
 - **Decision:** Computed from the Herbrand base size and rule recursion diameter via `closureDepthBound(program, domainSize)`, never a hardcoded constant.
@@ -180,6 +205,10 @@ In Datalog evaluation, recursive derivation proceeds until a fixpoint is reached
 - **Decision:** Enforce hard execution deadlines returning exit code 4 (`inconclusive-timeout`).
 - **Reason:** Distinguishes genuine invariant satisfaction from resource exhaustion, preventing false assurances.
 
-### Question 7: Where Lean Wins (Assurance Rule)
-- **Decision:** Lean is always the authoritative ground-truth reference.
-- **Reason:** Model checkers rely on complex lowering and SMT solvers. When Apalache reports no violation but Lean's verified evaluator derives a violation, the lowering or translation is defective. A `lowering-discrepancy` defect is filed with the full witness trace. Apalache evidence is categorized as `externally-attested`, never `kernel-backed`.
+### Question 7: Where Lean Wins (Authoritative Reference)
+- **Decision:** Lean's kernel-verified evaluator `Zil.Datalog.deriveProgramChecked` in `zil-lean` is the sole ground-truth reference, not the unverified fast engine (`Zil.Engine.closure`).
+- **Reason:** External model checkers (Apalache, Z3) rely on complex translations. When an external tool claims satisfaction but `deriveProgramChecked` derives a violation on a concrete instance, the lowering or solver is defective. A `lowering-discrepancy` defect is filed with the full witness trace. External solver evidence is categorized as `externally-attested`, never `kernel-backed`.
+
+### Question 8: Lowering Target and Interchangeable Backends (TS-05)
+- **Decision:** ZIL lowering targets the semantic transition-system layer `TSModule` directly.
+- **Reason:** Decouples ZIL semantics from Apalache-specific syntax. Both Apalache (via typed JSON IR / APL-10) and SMT-LIB 2 / Z3 (TS-03) consume the identical `TSModule`, enabling direct differential verification between independent backends.
