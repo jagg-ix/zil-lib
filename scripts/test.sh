@@ -57,7 +57,7 @@ else fail "the pin in lakefile.lean ($pinned) and lake-manifest.json ($resolved)
 # 2. build
 if [[ "$skip_build" -eq 0 ]]; then
   # the library gates run the core's compiler and audit and typecheck against its library: build them with the package
-  targets=(zilLibApalacheTests zilLibCertifyTests zilLibSmtTests zilLibLowerTests zilLibBatch3Tests zilLibBatch4Tests); [[ "$full" -eq 1 ]] && targets+=(zilLibTests zil-lean/zil zil-lean/zilTheoremAudit zil-lean/Zil)
+  targets=(zilLibApalacheTests zilLibCertifyTests zilLibSmtTests zilLibLowerTests zilLibBatch3Tests zilLibBatch4Tests zilLibBatch5Tests); [[ "$full" -eq 1 ]] && targets+=(zilLibTests zil-lean/zil zil-lean/zilTheoremAudit zil-lean/Zil)
   if lake build "${targets[@]}" >"$work/build.log" 2>&1; then pass "a build with failing java, apalache-mc and clojure shims succeeds"
   else fail "build"; tail -20 "$work/build.log" >&2; fi
 fi
@@ -256,7 +256,26 @@ grep -q 'information leak found at depth 1' "$work/command.out" && pass "zilLib 
 exit_of 2 "zilLib trace: nonexistent model" lake exe zilLib trace examples/does-not-exist.zc
 exit_of 2 "zilLib noninterference: nonexistent model" lake exe zilLib noninterference examples/does-not-exist.zc
 
-# 10. the libraries
+# 10. Extensions (Batch 5: APL-40 Equivalence, APL-46 Repair hints, APL-42 Test generation, APL-43 Stale views, APL-44 Numeric limits, APL-45 Composition)
+if [[ "$with_tool" -eq 1 ]]; then
+  if lake exe zilLibBatch5Tests >"$work/batch5-tests.log" 2>&1; then
+    pass "Batch 5 Tests: APL-40 equiv, APL-46 repair, APL-42 gentests, APL-43 stale views, APL-44 numeric limits, APL-45 composition"
+  else
+    fail "Batch 5 Tests"; tail -20 "$work/batch5-tests.log" >&2
+  fi
+
+  exit_of 0 "zilLib equiv: equivalent direct vs indirect RBAC policies" lake exe zilLib equiv examples/equivalence/01-rbac-direct.zc examples/equivalence/02-rbac-indirect.zc
+  exit_of 1 "zilLib equiv: divergence detected and replayed with repair hints" lake exe zilLib equiv examples/equivalence/01-rbac-direct.zc examples/equivalence/03-rbac-flawed.zc --repair
+  grep -q 'Rule repair analysis for divergent fact' "$work/command.out" && pass "zilLib repair: repair hints displayed" || fail "zilLib repair: hints missing"
+
+  exit_of 0 "zilLib gentests: test suite and coverage generation" lake exe zilLib gentests examples/equivalence/01-rbac-direct.zc
+  grep -q 'Rule Coverage:      3/3 (100%)' "$work/command.out" && pass "zilLib gentests: 100% rule coverage" || fail "zilLib gentests: coverage missing"
+
+  exit_of 2 "zilLib equiv: nonexistent model" lake exe zilLib equiv examples/does-not-exist.zc examples/does-not-exist.zc
+  exit_of 2 "zilLib gentests: nonexistent model" lake exe zilLib gentests examples/does-not-exist.zc
+fi
+
+# 11. the libraries
 if [[ "$full" -eq 1 ]]; then
   step() { # description command...
     local description="$1"; shift

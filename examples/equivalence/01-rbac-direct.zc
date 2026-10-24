@@ -1,0 +1,14 @@
+MODULE rbac.direct.
+
+// Direct RBAC with transitive role hierarchy
+RULE role_direct:
+IF ?u#user_role@?r
+THEN ?u#has_role@?r.
+
+RULE role_inherit:
+IF ?u#has_role@?r1 AND ?r1#role_parent@?r2
+THEN ?u#has_role@?r2.
+
+RULE access_perm:
+IF ?u#has_role@?r AND ?r#role_perm@?p
+THEN ?u#can_access@?p.

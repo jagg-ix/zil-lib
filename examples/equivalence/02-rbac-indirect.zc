@@ -1,0 +1,22 @@
+MODULE rbac.indirect.
+
+// Equivalent refactored RBAC with decomposed role inheritance
+RULE inherit_base:
+IF ?r1#role_parent@?r2
+THEN ?r1#role_inherit@?r2.
+
+RULE inherit_trans:
+IF ?r1#role_parent@?r2 AND ?r2#role_inherit@?r3
+THEN ?r1#role_inherit@?r3.
+
+RULE role_direct:
+IF ?u#user_role@?r
+THEN ?u#has_role@?r.
+
+RULE role_via_inherit:
+IF ?u#user_role@?r1 AND ?r1#role_inherit@?r2
+THEN ?u#has_role@?r2.
+
+RULE access_perm:
+IF ?u#has_role@?r AND ?r#role_perm@?p
+THEN ?u#can_access@?p.

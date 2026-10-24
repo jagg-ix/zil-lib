@@ -43,3 +43,7 @@ lean_exe zilLibBatch3Tests where
 lean_exe zilLibBatch4Tests where
   root := `ZilLib.Test.Batch4Main
 
+/-- Tests of Batch 5 (APL-40, APL-42, APL-43, APL-44, APL-45, APL-46). -/
+lean_exe zilLibBatch5Tests where
+  root := `ZilLib.Test.Batch5Main
+

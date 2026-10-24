@@ -60,6 +60,10 @@ def allAssignments (vars : List String) (nodes : List String) : List NodeSubst :
 def closureDepthBound (d : Domain) : Nat :=
   max (d.relations.size * d.nodes.size * d.nodes.size) 1
 
+/-- Normalize a relation name by stripping Lean identifier guillemets. -/
+def cleanRel (s : String) : String :=
+  if s.startsWith "«" && s.endsWith "»" then ((s.drop 1).dropEnd 1).toString else s
+
 /-- Lower a set of rules into the `TSModule.next` transition relation. -/
 def lowerNext (d : Domain) (rules : Array Rule) : Except String TSExpr := do
   -- 1. Safety check
@@ -76,7 +80,7 @@ def lowerNext (d : Domain) (rules : Array Rule) : Except String TSExpr := do
 
   -- For each relation and node pair (sub, obj), construct the next-state condition
   for rel in d.relations do
-    let rulesForRel := rules.filter (fun r => toString r.conclusion.relation == rel)
+    let rulesForRel := rules.filter (fun r => cleanRel (toString r.conclusion.relation) == cleanRel rel)
 
     for sub in d.nodes do
       for obj in d.nodes do
@@ -120,7 +124,7 @@ def lowerNext (d : Domain) (rules : Array Rule) : Except String TSExpr := do
 
               -- Positive premises
               for p in r.premises do
-                let pRel := toString p.relation
+                let pRel := cleanRel (toString p.relation)
                 match resolveTerm p.subject fullSubst, resolveTerm p.object fullSubst with
                 | some s_p, some o_p =>
                     let pVar := baseVarName pRel s_p o_p
@@ -145,7 +149,7 @@ def lowerNext (d : Domain) (rules : Array Rule) : Except String TSExpr := do
 
               -- Negative premises
               for np in r.negativePremises do
-                let npRel := toString np.relation
+                let npRel := cleanRel (toString np.relation)
                 match resolveTerm np.subject fullSubst, resolveTerm np.object fullSubst with
                 | some s_np, some o_np =>
                     let npVar := baseVarName npRel s_np o_np

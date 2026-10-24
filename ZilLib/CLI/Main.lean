@@ -6,6 +6,8 @@ import ZilLib.CLI.CheckCommands
 import ZilLib.CLI.UniversalCommands
 import ZilLib.CLI.TraceCommands
 import ZilLib.CLI.NonInterferenceCommands
+import ZilLib.CLI.EquivCommands
+import ZilLib.CLI.GenTestCommands
 
 /-!
 # `zilLib`
@@ -19,6 +21,9 @@ import ZilLib.CLI.NonInterferenceCommands
     zilLib universal <model.zc> [--inv QUERY] ...       (see ZilLib/CLI/UniversalCommands.lean)
     zilLib trace <model.zc> [--inv QUERY] ...           (see ZilLib/CLI/TraceCommands.lean)
     zilLib noninterference <model.zc> ...               (see ZilLib/CLI/NonInterferenceCommands.lean)
+    zilLib equiv <modelA.zc> <modelB.zc> ...            (see ZilLib/CLI/EquivCommands.lean)
+    zilLib repair <modelA.zc> <modelB.zc> ...           (see ZilLib/CLI/EquivCommands.lean)
+    zilLib gentests <model.zc> ...                      (see ZilLib/CLI/GenTestCommands.lean)
 
 Prints the number of facts, rules, queries and declarations of a model. Further commands arrive with the targets in
 `docs/targets.md`; this one shows that the package reads a model through the pinned core and nothing else.
@@ -45,6 +50,9 @@ def main (args : List String) : IO UInt32 := do
   | "universal" :: rest => ZilLib.CLI.UniversalCommands.runUniversal rest
   | "trace" :: rest => ZilLib.CLI.TraceCommands.run rest
   | "noninterference" :: rest => ZilLib.CLI.NonInterferenceCommands.run rest
+  | "equiv" :: rest => ZilLib.CLI.EquivCommands.run rest
+  | "repair" :: rest => ZilLib.CLI.EquivCommands.run ("--repair" :: rest)
+  | "gentests" :: rest => ZilLib.CLI.GenTestCommands.run rest
   | _ =>
       IO.eprintln "zilLib summary <model.zc>"
       IO.eprintln ZilLib.CLI.ApalacheCommands.usage
@@ -54,4 +62,6 @@ def main (args : List String) : IO UInt32 := do
       IO.eprintln ZilLib.CLI.UniversalCommands.usage
       IO.eprintln ZilLib.CLI.TraceCommands.usage
       IO.eprintln ZilLib.CLI.NonInterferenceCommands.usage
+      IO.eprintln ZilLib.CLI.EquivCommands.usage
+      IO.eprintln ZilLib.CLI.GenTestCommands.usage
       pure 2

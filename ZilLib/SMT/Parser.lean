@@ -17,11 +17,17 @@ def parseSmtVal (token : String) : Except String TSVal := do
   let t := token.trimAscii.toString
   if t == "true" then pure (.bool true)
   else if t == "false" then pure (.bool false)
-  else if t.startsWith "(- " && t.endsWith ")" then
-    let inner := (t.drop 3).dropEnd 1 |>.trimAscii.toString
-    match inner.toInt? with
-    | some n => pure (.int (-n))
-    | none => throw s!"cannot parse negative integer: '{t}'"
+  else if t.startsWith "(" && t.endsWith ")" then
+    let inner := (t.drop 1).dropEnd 1 |>.trimAscii.toString
+    if inner.startsWith "-" then
+      let numStr := (inner.drop 1).trimAscii.toString
+      match numStr.toInt? with
+      | some n => pure (.int (-n))
+      | none => throw s!"cannot parse negative integer: '{t}'"
+    else
+      match inner.toInt? with
+      | some n => pure (.int n)
+      | none => throw s!"cannot parse parenthesized value: '{t}'"
   else
     match t.toInt? with
     | some n => pure (.int n)
@@ -42,27 +48,31 @@ Handles nested parenthesized expressions like `((|v_x_0| 0) (|v_y_0| (- 1)))`.
 partial def parsePairs (tokens : List String) : Except String (List (String × String)) := do
   match tokens with
   | [] => pure []
+  | "(" :: varTok :: "(" :: rest =>
+      let cleanVar := if varTok.startsWith "|" && varTok.endsWith "|" then
+        (varTok.drop 1).dropEnd 1 |>.toString
+      else varTok
+      -- Collect nested parenthesized expression starting after the second '('
+      let rec collectNested (acc : List String) (depth : Nat) (toks : List String) : Except String (String × List String) :=
+        match toks with
+        | [] => throw "unexpected EOF in nested expression"
+        | ")" :: rem =>
+            if depth == 1 then pure (" ".intercalate (acc ++ [")"]), rem)
+            else collectNested (acc ++ [")"]) (depth - 1) rem
+        | "(" :: rem => collectNested (acc ++ ["("]) (depth + 1) rem
+        | item :: rem => collectNested (acc ++ [item]) depth rem
+      let (valStr, afterVal) ← collectNested ["("] 1 rest
+      match afterVal with
+      | ")" :: nextPairs =>
+          let tailPairs ← parsePairs nextPairs
+          pure ((cleanVar, valStr) :: tailPairs)
+      | _ => throw s!"expected ')' closing pair for {varTok}, got {afterVal.take 5}"
   | "(" :: varTok :: valTok :: ")" :: rest =>
       let cleanVar := if varTok.startsWith "|" && varTok.endsWith "|" then
         (varTok.drop 1).dropEnd 1 |>.toString
       else varTok
-      let (valStr, nextTokens) :=
-        if valTok == "(" then
-          -- Nested expression like `( - 5 )`
-          let rec collectNested (acc : List String) (depth : Nat) (toks : List String) : (String × List String) :=
-            match toks with
-            | [] => (" ".intercalate acc, [])
-            | ")" :: rem =>
-                if depth == 1 then (" ".intercalate (acc ++ [")"]), rem)
-                else collectNested (acc ++ [")"]) (depth - 1) rem
-            | "(" :: rem => collectNested (acc ++ ["("]) (depth + 1) rem
-            | item :: rem => collectNested (acc ++ [item]) depth rem
-          let (nested, rem) := collectNested ["("] 1 (valTok :: rest).tail!
-          (nested, rem)
-        else
-          (valTok, rest)
-      let tailPairs ← parsePairs nextTokens
-      pure ((cleanVar, valStr) :: tailPairs)
+      let tailPairs ← parsePairs rest
+      pure ((cleanVar, valTok) :: tailPairs)
   | _ => throw s!"malformed pair list starting at: {tokens.take 5}"
 
 /-- Tokenize SMT-LIB 2 text around parentheses and whitespace. -/
