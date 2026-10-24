@@ -67,9 +67,7 @@ Each milestone has an exit that can be shown, and a stop rule.
   step (`--length=1`), and prints either *inductive within these bounds* or the counterexample to induction.
 - **Exit:** reproduces the measured result in `docs/tool-notes.md`: `Bounded` is not inductive, the counterexample shows the missing
   conjunct, `IndInv` is inductive, and the injected defect is caught by the step check.
-- **Decision point (go/no-go for Track A beyond M3):** run it on three models other than `LockStep.tla`. Continue if it finds at least one
-  non-inductive invariant whose counterexample is a useful strengthening hint, or checks a domain the explicit-state checker could not finish.
-  Stop and keep M1 to M3 as a tool if it does neither.
+- **Decision point (resolved 2026-10-24, GO):** three models other than `LockStep.tla` (`TwoProcLock.tla`, `TokenArbiter.tla`, `RingBuffer.tla`) were run. Each found a non-inductive invariant whose counterexample to induction was a useful strengthening hint (`HolderMatches`, `TokenConsistency`, `PointerBalance`), which proved inductive when added, and faults were caught. Results are in `docs/tool-notes.md`. Decision is GO: Track A continues.
 
 ### M4 Typed IR and lowering of facts (APL-05, APL-10, APL-11, APL-12)
 

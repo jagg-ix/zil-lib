@@ -124,6 +124,27 @@ Reading it:
 - **The check can fail.** With the defect switched on, the step check fails (exit 12), as the bounded check does.
 - The fixed constants are still a bound. A statement for every value of `Max` needs a proof outside the tool.
 
+## Three invented models: decision point (APL-41, M3)
+
+Three models of different shapes were run through `zilLib apalache induct` and `check` on 2026-10-24 with Apalache 0.62.4:
+
+| Model | Command | Result | Time |
+|---|---|---|---|
+| `TwoProcLock.tla` | `check --cinit CInit --inv MutualExclusion --length 5` | no violation (exit 0) | 5 s |
+| `TwoProcLock.tla` | `induct --cinit CInit --indinit WeakInit --inv MutualExclusion` | not inductive: counterexample shows critical process without lock ownership | 7 s |
+| `TwoProcLock.tla` | `induct --cinit CInit --indinit StrongInit --inv IndInv` | inductive at the constants (exit 0) | 7 s |
+| `TwoProcLock.tla` | `induct --cinit CInitFault --indinit StrongInit --inv IndInv` | step check fails (exit 1) | 7 s |
+| `TokenArbiter.tla` | `check --cinit CInit --inv OneInUse --length 5` | no violation (exit 0) | 5 s |
+| `TokenArbiter.tla` | `induct --cinit CInit --indinit WeakInit --inv OneInUse` | not inductive: counterexample shows active process while token is held elsewhere | 7 s |
+| `TokenArbiter.tla` | `induct --cinit CInit --indinit StrongInit --inv IndInv` | inductive at the constants (exit 0) | 7 s |
+| `TokenArbiter.tla` | `induct --cinit CInitFault --indinit StrongInit --inv IndInv` | step check fails (exit 1) | 7 s |
+| `RingBuffer.tla` | `check --cinit CInit --inv EmptyMeansEqual --length 5` | no violation (exit 0) | 5 s |
+| `RingBuffer.tla` | `induct --cinit CInit --indinit WeakInit --inv EmptyMeansEqual` | not inductive: counterexample shows mismatched head/tail pointers | 7 s |
+| `RingBuffer.tla` | `induct --cinit CInit --indinit StrongInit --inv IndInv` | inductive at the constants (exit 0) | 7 s |
+| `RingBuffer.tla` | `induct --cinit CInitFault --indinit StrongInit --inv IndInv` | step check fails (exit 1) | 7 s |
+
+All three models found non-inductive invariants whose counterexamples to induction directly suggested the missing conjuncts needed for an inductive proof. The decision is GO.
+
 ## Not covered
 
 - Liveness and temporal properties: not tested; the safety invariants are what this looked at.
