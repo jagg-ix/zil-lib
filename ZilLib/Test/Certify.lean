@@ -2,6 +2,7 @@ import ZilLib.Certify
 import ZilLib.LeanFacts
 import ZilLib.Certify.Verified
 import ZilLib.Certify.Query
+import ZilLib.Test.Differential
 import ZilLib.Model
 import ZilLib.Test.Harness
 
@@ -328,12 +329,17 @@ private def leanFactTests (t : Tally) : IO Unit := do
   let cert ← certificate loaded
   t.expect "that program is certified" (check loaded.facts loaded.allRules cert).certified
 
-/-- Run the tests. -/
-def run : IO Bool := do
+/-- Run the tests. With `differential count seed`, only the comparison of the engine with the evaluator that has a proof, on that many
+random programs from that seed. -/
+def run (differential : Option (Nat × Nat) := none) : IO Bool := do
   let t ← Tally.new
+  if let some (count, seed) := differential then
+    Differential.run t count seed
+    return ← t.finish
   leanFactTests t
   translationTests t
   queryTests t
+  Differential.run t 300 20261024
   matchingTests t
   stratificationTests t
   positiveTests t

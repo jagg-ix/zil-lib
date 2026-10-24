@@ -17,7 +17,11 @@ The translation is the part that is trusted, and it is meant to be easy to read:
 * attribute values keep their kind: text and decimal numbers become strings with a prefix, so that `"1.0"` as text and as a decimal are
   different;
 * attributes are sorted by key, because the engine compares them as a map and the Lean-embedded atoms compare them as a list;
-* a rule has its positive premises, then its negative ones; a fact with a variable, or two attributes with one key, is refused.
+* a rule has its positive premises, then its negative ones; a fact with a variable, or two attributes with one key, is refused;
+* the two evaluators differ in one place, and the translation refuses it: the engine matches a variable in an attribute pattern only
+  against a value that is a node (`[owner=?o]` matches `[owner=team.a]`, not `[owner="a"]` or `[owner=3]`), and the Lean-embedded
+  Datalog binds it to any value. A program is refused when a fact of the certificate has a text, number or boolean value for a key that
+  some rule reads with a variable.
 
 The proved checker is a plain list implementation written for the proof, not for speed: use it on programs of some hundreds of facts.
 -/
@@ -91,9 +95,31 @@ def toCertificate (certificate : Certificate) : Except String Datalog.Certificat
   certificate.toList.mapM fun node => do
     pure { atom := ← toAtom node.fact, origin := node.rule.map fun name => (name, node.premises.toList) }
 
+/-- The attribute keys that some rule reads with a variable. -/
+private def variableKeys (rules : Array Rule) : Array Name :=
+  rules.foldl (init := #[]) fun keys rule =>
+    (rule.premises ++ rule.negativePremises).foldl (init := keys) fun keys relation =>
+      relation.attrs.foldl (init := keys) fun keys entry =>
+        match entry.value with
+        | .term (.var _) => if keys.contains entry.key then keys else keys.push entry.key
+        | _ => keys
+
+/-- A fact whose value for a key that a rule reads with a variable is not a node: the engine does not bind the variable to it and the
+Lean-embedded Datalog does, so the proved checker would be judging another program. -/
+def literalBehindVariable? (facts : Array RelExpr) (rules : Array Rule) : Option String :=
+  let keys := variableKeys rules
+  facts.findSome? fun fact =>
+    fact.attrs.findSome? fun entry =>
+      match entry.value with
+      | .term _ => none
+      | _ => if keys.contains entry.key then
+          some s!"{render fact} has a text, number or boolean value for {entry.key}, which a rule reads with a variable; the engine does not bind a variable to such a value, and the proved checker would"
+        else none
+
 /-- Check the engine's certificate with the proved checker. `Except.error` means the program or the certificate could not be
 translated; `ok false` means the proved checker refused. -/
 def check (facts : Array RelExpr) (rules : Array Rule) (certificate : Certificate) : Except String Bool := do
+  if let some problem := literalBehindVariable? (certificate.map (·.fact)) rules then throw problem
   let program ← toProgram facts rules
   let cert ← toCertificate certificate
   pure (Datalog.checkCertificate program cert)

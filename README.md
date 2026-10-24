@@ -646,6 +646,16 @@ functions that match a rule against facts (`unify` and `instantiate`), and the p
 written for the proof: the 18 expanded libraries (5270 facts) take about a second each at most, and a program of many thousands of rule
 instances would take far longer.
 
+One difference between the two evaluators is refused rather than translated: the engine binds a variable in an attribute pattern
+(`[owner=?o]`) only to a value that is a node, and the proved checker binds it to any value. If a fact of the certificate has a text,
+number or boolean value for a key that some rule reads with a variable, `--verified` stops with the fact named.
+
+The two evaluators also check each other. `lake exe zilLibCertifyTests` generates 300 small random programs (facts with attributes, rules
+with two positive premises, a negative premise over a lower relation, attribute patterns) and requires the engine's closure and the
+proved evaluator's result to be the same set of facts. `lake exe zilLibCertifyTests --differential COUNT SEED` runs more: 65,000
+programs from five seeds agree. Removing the negative literals, or the attributes of the patterns, from the translation makes the
+comparison fail within a few programs, so it does look at them.
+
 A model that uses macros from a library is read with that library, as `zil expand` reads it. `--lib PATH` prepends the `.zc` files of a
 directory in name order, or one `.zc` file, and may be given more than once. The certificate is that of the expanded program, which is the
 program the engine runs. Without the option, the model has to define its own macros:

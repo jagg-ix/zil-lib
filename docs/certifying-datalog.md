@@ -129,6 +129,7 @@ byte-identical, and the models that are refused are refused in the same way. A c
 | CERT-13 | The provenance builder of the core is quadratic; an index brings it near the checker's cost | done 2026-10-23, zil-lean `1614a4e`; the traces of every model here are byte-identical before and after |
 | CERT-14 | Read fact bases written as `zil_fact` lines (the line form of the Lean command) in `.zc` files, which the core's parser refuses | done 2026-10-23, `ZilLib/LeanFacts.lean`; a fact over several lines or a string with an escape is an error |
 | CERT-15 | Run the proved checker on the engine's programs | done 2026-10-24, `ZilLib/Certify/Verified.lean` and `zilLib certify --verified`: the program and the certificate are translated to the Lean-embedded Datalog; the 18 expanded libraries and the tour model are accepted, and every fault the tests inject is refused |
+| CERT-16 | Test the engine against the evaluator that has a proof, on random programs | done 2026-10-24, `ZilLib/Test/Differential.lean`: 300 programs in the gate and `--differential COUNT SEED`; 65,000 programs from five seeds agree. Found one difference of meaning, not a defect: a variable in an attribute pattern binds only a node in the engine and any value in the Lean-embedded Datalog (the translation refuses such a program) |
 
 ## The note's targets, and ours
 
