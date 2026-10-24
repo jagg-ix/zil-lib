@@ -55,7 +55,7 @@ So the matrix runner and the gates can run here without copying anything from th
 
 ## Order
 
-Each step is one pull request in the repository it names. Steps with the same prerequisite can run in parallel.
+Each step is one commit (or short series) in the repository it names. Steps with the same prerequisite can run in parallel.
 
 | ID | Step | Done when | Needs | Status |
 |---|---|---|---|---|

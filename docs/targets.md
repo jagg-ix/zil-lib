@@ -144,7 +144,7 @@ APL-05 is accepted and runs in parallel with APL-10 to APL-14. S2 and S3 follow.
 ## Work queue (2026-10-24)
 
 What is not done, in the order to do it. A batch is a set of targets that are reviewed together; take the first batch that is not
-finished. Inside a batch every target is its own pull request, and `docs/targets.md` (this table), `docs/certifying-datalog.md` (the CERT
+finished. Inside a batch every target is its own commit (or short series of commits) on `main`, and `docs/targets.md` (this table), `docs/certifying-datalog.md` (the CERT
 table) and `docs/move-libsets.md` (the LIB table) are updated in the same change.
 
 | Batch | Targets | Why here | Done when |
@@ -160,7 +160,7 @@ table) and `docs/move-libsets.md` (the LIB table) are updated in the same change
 | L | LIB-13, LIB-15 | one decision, then the move | `lib/` is decided and the runner exists once |
 
 Waits for the maintainer, not for a helper: LIB-10 (a project that pins the core also pins this repository; the project is not in this
-repository); whether a pull request is merged or the target is pushed to `main`; a force push to the core's protected `main`; whether the
+repository); a force push to the core's protected `main`; whether the
 engine and the Lean-embedded evaluator should treat a variable in an attribute pattern alike (the engine binds it only to a node, the
 evaluator to any value; `ZilLib/Certify/Verified.lean` refuses the difference today).
 
@@ -247,14 +247,15 @@ Starting points:
 
 ## Taking a target
 
-- Pick the lowest unblocked ID. Say which one in the pull request title.
-- One target per pull request. Update this table in the same change: status, the test names, and what was measured.
+- Pick the lowest unblocked ID. Say which one in the subject of the commit.
+- One target per commit (or short series). Update this table in the same commit: status, the test names, and what was measured.
 - Write what the evidence shows with the right word: *checked within bound* for a pass, *violation confirmed by replay* for a
   failure, *tool unavailable* when the tool is missing. Never *proved*.
 - Record tool versions and exact commands in `spec/apalache-tool-notes.md`. A result without them cannot be reproduced.
 - Do not vendor the tool or its jar. The repository finds it on the machine and says so when it is not there.
-- A target names the repository it changes; none edits both the core and `zil-lib` in one pull request.
-- Do not merge to the main branch without the maintainer's word.
+- A target names the repository it changes; none edits both the core and `zil-lib` in one commit.
+- Changes to `zil-lean` and `zil-lib` go by direct push to `main`, not by pull request (the maintainer's instruction, 2026-10-24). Before every push: `git pull --rebase`; the repository's gate (`scripts/test.sh` here, `bin/zil test --profile lean` in the core); a scan of what changed for private names. Never force-push, and never rewrite pushed history; the core's `main` is protected against it.
+- A contract (APL-00, TS-00) keeps the word *drafted* until the maintainer says *accepted*; work that depends on it waits for that word.
 
 ## Non-goals
 
