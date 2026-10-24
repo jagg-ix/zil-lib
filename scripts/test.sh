@@ -57,7 +57,7 @@ else fail "the pin in lakefile.lean ($pinned) and lake-manifest.json ($resolved)
 # 2. build
 if [[ "$skip_build" -eq 0 ]]; then
   # the library gates run the core's compiler and audit and typecheck against its library: build them with the package
-  targets=(zilLibApalacheTests zilLibCertifyTests zilLibSmtTests zilLibLowerTests); [[ "$full" -eq 1 ]] && targets+=(zilLibTests zil-lean/zil zil-lean/zilTheoremAudit zil-lean/Zil)
+  targets=(zilLibApalacheTests zilLibCertifyTests zilLibSmtTests zilLibLowerTests zilLibBatch3Tests); [[ "$full" -eq 1 ]] && targets+=(zilLibTests zil-lean/zil zil-lean/zilTheoremAudit zil-lean/Zil)
   if lake build "${targets[@]}" >"$work/build.log" 2>&1; then pass "a build with failing java, apalache-mc and clojure shims succeeds"
   else fail "build"; tail -20 "$work/build.log" >&2; fi
 fi
@@ -143,9 +143,9 @@ while IFS=$'\t' read -r name library model; do
   lake exe zilLib certify "$model" ${options[@]+"${options[@]}"} "$work/$name.cert.json" --json "$work/$name.cert2.json" >/dev/null 2>&1 || json_unsound="$json_unsound $name(verify)"
   cmp -s "$work/$name.cert.json" "$work/$name.cert2.json" || json_unsound="$json_unsound $name(bytes)"
 done < <(grep -v "^#" spec/macro-extension-matrix.tsv)
-[[ "$rows" -eq 18 && -z "$unsound" ]] && pass "certify: all $rows models of spec/macro-extension-matrix.tsv, read with their libraries, are certified, and accepted by the proved checker" \
+[[ "$rows" -eq 19 && -z "$unsound" ]] && pass "certify: all $rows models of spec/macro-extension-matrix.tsv, read with their libraries, are certified, and accepted by the proved checker" \
   || fail "certify: $rows rows read, not certified:$unsound"
-[[ "$rows" -eq 18 && -z "$json_unsound" ]] && pass "certify: all $rows models of spec/macro-extension-matrix.tsv: JSON certificates read back, certified, and byte-deterministic" \
+[[ "$rows" -eq 19 && -z "$json_unsound" ]] && pass "certify: all $rows models of spec/macro-extension-matrix.tsv: JSON certificates read back, certified, and byte-deterministic" \
   || fail "certify: $rows JSON certificates read, not certified:$json_unsound"
 lake exe zilLib certify examples/tour/01-blast-radius.zc --json >"$work/stdout.cert.json" 2>"$work/stdout.cert.err"
 if python3 -I -c 'import json, sys; d = json.load(open(sys.argv[1])); assert d["format"] == "ZIL-CERTIFICATE/1"' "$work/stdout.cert.json" 2>/dev/null; then
@@ -227,7 +227,19 @@ grep -q 'replayed and confirmed by Lean reference engine' "$work/command.out" &&
 exit_of 2 "zilLib check: unknown query" lake exe zilLib check examples/tour/01-blast-radius.zc --inv nonexistent_query
 exit_of 2 "zilLib check: missing model" lake exe zilLib check examples/does-not-exist.zc
 
-# 8. the libraries
+# 8. Check Vocabulary & Universal Contract Checking (Batch 3: APL-05, APL-30 / S1)
+if [[ "$(lake exe zilLibBatch3Tests $lower_opt 2>&1 | tee "$work/batch3-tests.log" | tail -1)" =~ ^[0-9]+\ passed,\ 0\ failed$ ]]; then
+  pass "Check Vocabulary & Universal Checking: APL-05 macros, S1 N=2..6 bounds, seeded flaw N<=3, fail-closed timeout ($(tail -1 "$work/batch3-tests.log"))"
+else fail "Batch 3 Tests"; grep '^FAIL' "$work/batch3-tests.log" >&2 || tail -5 "$work/batch3-tests.log" >&2; fi
+
+exit_of 0 "zilLib universal: clean delegation policy N=2..6" lake exe zilLib universal examples/universal/01-delegation.zc
+exit_of 0 "zilLib universal: clean least-privilege policy N=2..6" lake exe zilLib universal examples/universal/02-least-privilege.zc
+exit_of 1 "zilLib universal: flawed policy finds flaw at N<=3" lake exe zilLib universal examples/universal/03-flawed-admin.zc
+grep -q 'violation-found (depth 3, replayed)' "$work/command.out" && pass "zilLib universal: violation confirmed and replayed" || fail "zilLib universal: replay confirmation missing"
+
+exit_of 2 "zilLib universal: nonexistent model" lake exe zilLib universal examples/does-not-exist.zc
+
+# 9. the libraries
 if [[ "$full" -eq 1 ]]; then
   step() { # description command...
     local description="$1"; shift

@@ -34,3 +34,7 @@ lean_exe zilLibSmtTests where
 /-- Tests of ZIL lowering, step operator, and witness replay (Batch 2). -/
 lean_exe zilLibLowerTests where
   root := `ZilLib.Test.LowerMain
+
+/-- Tests of check vocabulary and universal contract checking (Batch 3: APL-05 and APL-30). -/
+lean_exe zilLibBatch3Tests where
+  root := `ZilLib.Test.Batch3Main

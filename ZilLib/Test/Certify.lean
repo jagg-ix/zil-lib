@@ -71,7 +71,7 @@ private def positiveTests (t : Tally) : IO Unit := do
     t.expect s!"{entry.fileName}: certified ({result.facts} facts)" result.certified
       (String.intercalate "; " (result.problems.map (·.detail)).toList)
     t.expect s!"{entry.fileName}: accepted by the proved checker" (accepted model cert)
-  t.expect "all expanded macro libraries were checked" (goldens.size == 18) s!"{goldens.size} files"
+  t.expect "all expanded macro libraries were checked" (goldens.size == 19) s!"{goldens.size} files"
   IO.println s!"      {totalFacts} facts in {goldens.size} expanded libraries"
   -- the paper's example 3: the proof tree of trans(0,20) is exponential, the graph is not
   let paper ← program (exponential 20)

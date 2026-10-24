@@ -3,6 +3,7 @@ import ZilLib.CLI.ApalacheCommands
 import ZilLib.CLI.CertifyCommands
 import ZilLib.CLI.SMTCommands
 import ZilLib.CLI.CheckCommands
+import ZilLib.CLI.UniversalCommands
 
 /-!
 # `zilLib`
@@ -13,6 +14,7 @@ import ZilLib.CLI.CheckCommands
     zilLib smt version|check|induct ...                 (see ZilLib/CLI/SMTCommands.lean)
     zilLib typecheck <model.zc>                         (see ZilLib/CLI/CheckCommands.lean)
     zilLib check <model.zc> [--inv QUERY] ...           (see ZilLib/CLI/CheckCommands.lean)
+    zilLib universal <model.zc> [--inv QUERY] ...       (see ZilLib/CLI/UniversalCommands.lean)
 
 Prints the number of facts, rules, queries and declarations of a model. Further commands arrive with the targets in
 `docs/targets.md`; this one shows that the package reads a model through the pinned core and nothing else.
@@ -36,10 +38,12 @@ def main (args : List String) : IO UInt32 := do
   | "smt" :: rest => ZilLib.CLI.SMTCommands.run rest
   | "typecheck" :: rest => ZilLib.CLI.CheckCommands.runTypecheck rest
   | "check" :: rest => ZilLib.CLI.CheckCommands.runCheck rest
+  | "universal" :: rest => ZilLib.CLI.UniversalCommands.runUniversal rest
   | _ =>
       IO.eprintln "zilLib summary <model.zc>"
       IO.eprintln ZilLib.CLI.ApalacheCommands.usage
       IO.eprintln ZilLib.CLI.CertifyCommands.usage
       IO.eprintln ZilLib.CLI.SMTCommands.usage
       IO.eprintln ZilLib.CLI.CheckCommands.usage
+      IO.eprintln ZilLib.CLI.UniversalCommands.usage
       pure 2

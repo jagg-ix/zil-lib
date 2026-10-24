@@ -1,0 +1,45 @@
+MODULE check.vocab.governance.demo.
+subject:alice#kind@entity:subject.
+subject:bob#kind@entity:subject.
+role:admin#kind@entity:role.
+role:auditor#kind@entity:role.
+subject:alice#has_role@role:admin.
+check:bound_subject#kind@entity:check_bound.
+check:bound_subject#entity_sort@sort:subject.
+check:bound_subject#max_nodes@value:4.
+check:bound_role#kind@entity:check_bound.
+check:bound_role#entity_sort@sort:role.
+check:bound_role#max_nodes@value:2.
+check:inv_separation_of_duty#kind@entity:check_invariant.
+check:inv_separation_of_duty#invariant_name@name:separation_of_duty.
+check:inv_separation_of_duty#target_query@query:query_unauthorized_execution.
+check:op_grant_admin#kind@entity:check_operation.
+check:op_grant_admin#op_name@name:grant_admin.
+check:op_grant_admin#guard_query@query:query_is_active_admin.
+check:op_param_grant_admin_target_user#kind@entity:check_op_param.
+check:op_param_grant_admin_target_user#operation@name:grant_admin.
+check:op_param_grant_admin_target_user#param@name:target_user.
+check:op_param_grant_admin_target_user#sort@sort:subject.
+check:op_add_grant_admin_bob_has_role_admin#kind@entity:check_op_add.
+check:op_add_grant_admin_bob_has_role_admin#operation@name:grant_admin.
+check:op_add_grant_admin_bob_has_role_admin#subject@node:bob.
+check:op_add_grant_admin_bob_has_role_admin#relation@relation:has_role.
+check:op_add_grant_admin_bob_has_role_admin#object@node:admin.
+check:op_revoke_admin#kind@entity:check_operation.
+check:op_revoke_admin#op_name@name:revoke_admin.
+check:op_revoke_admin#guard_query@query:query_is_active_admin.
+check:op_rem_revoke_admin_bob_has_role_admin#kind@entity:check_op_remove.
+check:op_rem_revoke_admin_bob_has_role_admin#operation@name:revoke_admin.
+check:op_rem_revoke_admin_bob_has_role_admin#subject@node:bob.
+check:op_rem_revoke_admin_bob_has_role_admin#relation@relation:has_role.
+check:op_rem_revoke_admin_bob_has_role_admin#object@node:admin.
+RULE r_admin_can_execute:
+IF ?u#has_role@role:admin
+THEN ?u#can_execute@action:root.
+RULE r_auditor_can_audit:
+IF ?u#has_role@role:auditor
+THEN ?u#can_audit@action:audit.
+QUERY query_is_active_admin:
+FIND ?u WHERE ?u#has_role@role:admin.
+QUERY query_unauthorized_execution:
+FIND ?u WHERE ?u#can_execute@action:root AND NOT ?u#has_role@role:admin.

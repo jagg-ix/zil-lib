@@ -1,0 +1,44 @@
+MODULE check.vocab.governance.demo.
+
+// Example 1 for APL-05: Administrative governance and bound specification.
+// Reuses RBD_* concepts (subjects, roles) and defines check vocabulary bounds, operations, and invariants.
+
+// Subjects and roles
+subject:alice#kind@entity:subject.
+subject:bob#kind@entity:subject.
+role:admin#kind@entity:role.
+role:auditor#kind@entity:role.
+
+// Initial assignment
+subject:alice#has_role@role:admin.
+
+// Bounds for model checking
+USE CHECK_BOUND(subject, 4).
+USE CHECK_BOUND(role, 2).
+
+// Safety invariant: non-admin must not hold root execution authority
+USE CHECK_INVARIANT(separation_of_duty, query_unauthorized_execution).
+
+// Administrative operations
+USE CHECK_OPERATION(grant_admin, query_is_active_admin).
+USE CHECK_OPERATION_PARAM(grant_admin, target_user, subject).
+USE CHECK_OPERATION_ADD(grant_admin, bob, has_role, admin).
+
+USE CHECK_OPERATION(revoke_admin, query_is_active_admin).
+USE CHECK_OPERATION_REMOVE(revoke_admin, bob, has_role, admin).
+
+// Derivation rules
+RULE r_admin_can_execute:
+IF ?u#has_role@role:admin
+THEN ?u#can_execute@action:root.
+
+RULE r_auditor_can_audit:
+IF ?u#has_role@role:auditor
+THEN ?u#can_audit@action:audit.
+
+// Invariant queries
+QUERY query_is_active_admin:
+FIND ?u WHERE ?u#has_role@role:admin.
+
+QUERY query_unauthorized_execution:
+FIND ?u WHERE ?u#can_execute@action:root AND NOT ?u#has_role@role:admin.

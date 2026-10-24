@@ -1,0 +1,21 @@
+MODULE universal.least_privilege.clean.
+
+// Clean Policy 2 for APL-30: Least Privilege Policy.
+// Invariant: Guest accounts cannot acquire write access to confidential objects.
+
+// Fixed configuration
+user:guest#is_guest@value:true.
+object:confidential#is_confidential@value:true.
+
+// Rules
+RULE r_role_grant:
+IF ?u#member_of@?r AND ?r#permits@?act AND NOT ?u#is_guest@value:true
+THEN ?u#has_action@?act.
+
+RULE r_access_check:
+IF ?u#has_action@action:write AND ?obj#is_confidential@value:true
+THEN ?u#can_write@?obj.
+
+// Safety invariant: guest must never have write access to confidential data
+QUERY inv_no_guest_write:
+FIND ?u ?obj WHERE ?u#is_guest@value:true AND ?u#can_write@?obj.

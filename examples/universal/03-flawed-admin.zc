@@ -1,0 +1,30 @@
+MODULE universal.admin.flawed.
+
+// Flawed Policy 3 for APL-30: Seeded Transitive Trust Escalation Flaw.
+// Seeded flaw: Direct trust between untrusted users and admin is forbidden,
+// but transitive trust allows an untrusted user to chain through an intermediary proxy (N >= 3)
+// to inherit admin privileges, violating the safety invariant at N <= 3.
+
+// Fixed configuration
+node:n0#is_untrusted@node:n0.
+node:n1#has_admin@node:n1.
+node:n0#forbidden_direct@node:n1.
+
+// Base trust rule enforcing direct restriction
+RULE r_direct_trust:
+IF ?a#declares_trust@?b AND NOT ?a#forbidden_direct@?b
+THEN ?a#trusts@?b.
+
+// Transitive trust rule (the seeded flaw)
+RULE r_trust_trans:
+IF ?a#trusts@?b AND ?b#trusts@?c
+THEN ?a#trusts@?c.
+
+// Privilege acquisition rule
+RULE r_trust_grants_admin:
+IF ?u#trusts@?admin AND ?admin#has_admin@?admin
+THEN ?u#has_admin@?u.
+
+// Safety invariant: untrusted user must never acquire admin rights
+QUERY inv_no_untrusted_admin:
+FIND ?u WHERE ?u#is_untrusted@?u AND ?u#has_admin@?u.

@@ -1,0 +1,21 @@
+MODULE universal.delegation.clean.
+
+// Clean Policy 1 for APL-30: Delegation Policy.
+// Invariant: An unauthorized user cannot acquire root privileges through delegation.
+
+// Fixed configuration
+user:root_admin#has_perm@perm:root.
+user:unauthorized#is_unauthorized@value:true.
+
+// Rules
+RULE r_direct_access:
+IF ?u#has_perm@?p
+THEN ?u#can_use@?p.
+
+RULE r_delegate_step:
+IF ?from#delegates_to@?to AND ?to#has_perm@?p AND NOT ?to#is_unauthorized@value:true AND NOT ?from#is_unauthorized@value:true
+THEN ?from#has_perm@?p.
+
+// Safety invariant: unauthorized user must not obtain root permission
+QUERY inv_no_unauthorized_root:
+FIND ?u WHERE ?u#is_unauthorized@value:true AND ?u#can_use@perm:root.

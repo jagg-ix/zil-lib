@@ -1,0 +1,61 @@
+MODULE check.vocab.lib.
+
+// Checking vocabulary macro layer for ZIL (APL-05 / LIB-14).
+//
+// Provides macros for specifying:
+// - Domain bounds (CHECK_BOUND)
+// - Safety invariants as queries returning nothing (CHECK_INVARIANT)
+// - Public projections for non-interference checks (CHECK_PUBLIC)
+// - Administrative operations with guards and state updates (CHECK_OPERATION)
+// Reuses standard ZIL primitives (tuples, rules, queries).
+
+// 1. Domain bound specification for uninterpreted or partitioned node sorts.
+MACRO CHECK_BOUND(sort, max_nodes):
+EMIT check:bound_{{sort}}#kind@entity:check_bound.
+EMIT check:bound_{{sort}}#entity_sort@sort:{{sort}}.
+EMIT check:bound_{{sort}}#max_nodes@value:{{max_nodes}}.
+ENDMACRO.
+
+// 2. Safety invariant: query that must return no records (empty answer set).
+MACRO CHECK_INVARIANT(name, query_name):
+EMIT check:inv_{{name}}#kind@entity:check_invariant.
+EMIT check:inv_{{name}}#invariant_name@name:{{name}}.
+EMIT check:inv_{{name}}#target_query@query:{{query_name}}.
+ENDMACRO.
+
+// 3. Public projection for non-interference (information-flow security).
+MACRO CHECK_PUBLIC(name, relation_name):
+EMIT check:pub_{{name}}#kind@entity:check_public_projection.
+EMIT check:pub_{{name}}#projection_name@name:{{name}}.
+EMIT check:pub_{{name}}#relation@relation:{{relation_name}}.
+ENDMACRO.
+
+// 4. Operation specification: guard query, parameters, tuple additions and removals.
+MACRO CHECK_OPERATION(op_name, guard_query):
+EMIT check:op_{{op_name}}#kind@entity:check_operation.
+EMIT check:op_{{op_name}}#op_name@name:{{op_name}}.
+EMIT check:op_{{op_name}}#guard_query@query:{{guard_query}}.
+ENDMACRO.
+
+MACRO CHECK_OPERATION_PARAM(op_name, param_name, param_sort):
+EMIT check:op_param_{{op_name}}_{{param_name}}#kind@entity:check_op_param.
+EMIT check:op_param_{{op_name}}_{{param_name}}#operation@name:{{op_name}}.
+EMIT check:op_param_{{op_name}}_{{param_name}}#param@name:{{param_name}}.
+EMIT check:op_param_{{op_name}}_{{param_name}}#sort@sort:{{param_sort}}.
+ENDMACRO.
+
+MACRO CHECK_OPERATION_ADD(op_name, subject, relation, object):
+EMIT check:op_add_{{op_name}}_{{subject}}_{{relation}}_{{object}}#kind@entity:check_op_add.
+EMIT check:op_add_{{op_name}}_{{subject}}_{{relation}}_{{object}}#operation@name:{{op_name}}.
+EMIT check:op_add_{{op_name}}_{{subject}}_{{relation}}_{{object}}#subject@node:{{subject}}.
+EMIT check:op_add_{{op_name}}_{{subject}}_{{relation}}_{{object}}#relation@relation:{{relation}}.
+EMIT check:op_add_{{op_name}}_{{subject}}_{{relation}}_{{object}}#object@node:{{object}}.
+ENDMACRO.
+
+MACRO CHECK_OPERATION_REMOVE(op_name, subject, relation, object):
+EMIT check:op_rem_{{op_name}}_{{subject}}_{{relation}}_{{object}}#kind@entity:check_op_remove.
+EMIT check:op_rem_{{op_name}}_{{subject}}_{{relation}}_{{object}}#operation@name:{{op_name}}.
+EMIT check:op_rem_{{op_name}}_{{subject}}_{{relation}}_{{object}}#subject@node:{{subject}}.
+EMIT check:op_rem_{{op_name}}_{{subject}}_{{relation}}_{{object}}#relation@relation:{{relation}}.
+EMIT check:op_rem_{{op_name}}_{{subject}}_{{relation}}_{{object}}#object@node:{{object}}.
+ENDMACRO.

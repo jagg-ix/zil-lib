@@ -20,3 +20,4 @@ souffle-compat	libsets/souffle-compat	examples/souffle-transitive-closure.zc
 process-algebra	libsets/process-algebra	examples/process-algebra-checks.zc
 proof-evidence	libsets/proof-evidence	examples/proof-evidence/contracts.zc
 discovery-api	libsets/discovery-api	examples/discovery-api/sample-model.zc
+check-vocab	libsets/check-vocab	examples/check-vocab-governance.zc

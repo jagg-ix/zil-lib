@@ -1,0 +1,35 @@
+MODULE check.vocab.policy.demo.
+
+// Example 2 for APL-05: Non-interference public projection and invariant checking.
+
+// Entities
+principal:alice#kind@entity:principal.
+principal:bob#kind@entity:principal.
+channel:public_feed#kind@entity:channel.
+channel:secret_store#kind@entity:channel.
+
+// Bounds
+USE CHECK_BOUND(principal, 5).
+USE CHECK_BOUND(channel, 2).
+
+// Public projection: public channel reads are observable
+USE CHECK_PUBLIC(public_observations, audited_event).
+
+// Safety invariant: secret channel data must not flow to public feed
+USE CHECK_INVARIANT(non_interference, query_covert_flow).
+
+// Direct observations
+principal:alice#audited_event@channel:public_feed.
+
+// Propagation rules
+RULE r_flow_step:
+IF ?p#reads@?c AND ?c#contains@?data
+THEN ?p#knows@?data.
+
+RULE r_covert_flow_detect:
+IF ?p#knows@data:secret AND ?p#audited_event@channel:public_feed
+THEN ?p#leak@data:secret.
+
+// Invariant query
+QUERY query_covert_flow:
+FIND ?p ?data WHERE ?p#leak@?data.
