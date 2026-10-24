@@ -67,10 +67,10 @@ database by the rules with the negated conditions read against *M*; that is, *M*
 program by *M*. Check 2 says that *M* is closed under that reduct and contains the database, so it contains the least model. Hence *M* is
 the least model of its own reduct, which is the definition of a *stable model* of the program. A stratified program has exactly one stable
 model, the perfect model, and the perfect model is what the engine's stratified loop is meant to compute. So a certificate that passes
-states: *M* is the perfect model of this program. The argument is not in the paper. Its first half, that *M* is a stable model, is proved
-in Lean for the Lean-embedded Datalog (zil-lean `Zil.Datalog.checkCertificate_sound`, `spec/datalog-semantics-v1.md` in the core), and
-`zilLib certify --verified` applies that checker to a translation of an engine program. The second half, that a stratified program has
-exactly one stable model and the engine computes it, is on paper (CERT-10).
+states: *M* is the perfect model of this program. The argument is not in the paper. It is proved in Lean for the Lean-embedded Datalog
+(zil-lean `Zil.Datalog.checkCertificate_sound` for "*M* is a stable model" and `checkCertificate_unique` for "there is no other";
+`spec/datalog-semantics-v1.md` in the core), and `zilLib certify --verified` applies that checker to a translation of an engine program.
+What is on paper is the last step, that the perfect model the engine computes is that stable model (CERT-10).
 
 What the checker does not establish: that the parser reads the file as the author meant; that the checker's own matching has no bug (it is
 tested on 18 expanded libraries (5270 facts), on the paper's example 3 and on eleven kinds of faulty certificate; five faults injected by hand into the
@@ -123,7 +123,7 @@ byte-identical, and the models that are refused are refused in the same way. A c
 | CERT-07 | `zilLib certify` over the macro libraries as a test of the engine | done 2026-10-23 for the 18 rows of the matrix, each model read with its library (`--lib`); the libraries outside the matrix (`model-substrate`, `diff-patch`) are not covered |
 | CERT-08 | The engine reaches the fixpoint or fails; no silent truncation (a change in `zil-lean`) | done 2026-10-23, zil-lean `cdec3f2`; the pin of this repository is there |
 | CERT-09 | Certify one query's answers, including a negative answer ("this fact is not entailed"), from the closure | not started |
-| CERT-10 | The semantics in Lean (ground programs, stable and perfect models) and a theorem that a passing check means the perfect model. Read `CertifyingDatalog` and its license before reusing any of it | partly done 2026-10-24, zil-lean `022896d`: models, derivations, least and stable models, the equivalence of the two semantics for a program without negation, and `checkCertificate_sound` and `checkCertificate_leastModel` for the Lean-embedded Datalog. Not done: that a stratified program has one stable model; that `unify` agrees with declarative matching; a proof about this repository's own checker |
+| CERT-10 | The semantics in Lean (ground programs, stable and perfect models) and a theorem that a passing check means the perfect model. Read `CertifyingDatalog` and its license before reusing any of it | partly done 2026-10-24, zil-lean `1f172d7`: models, derivations, least and stable models, the equivalence of the two semantics for a program without negation, `checkCertificate_sound`, `checkCertificate_leastModel` and `checkCertificate_unique` for the Lean-embedded Datalog, and `stable_unique` (a stratified program has one stable model). Not done: that the engine's stratum-by-stratum result is that stable model; that `unify` agrees with declarative matching; a proof about this repository's own checker |
 | CERT-11 | A JSON encoding of certificates like the paper's, so that a trace from Nemo or Soufflé can be checked against a ZIL model; relations are ternary here (`subject#relation@object`) with attributes | not started |
 | CERT-12 | Replay of an Apalache counterexample: the trace is mapped to a set of facts and checked with the same matching and closure functions (APL-22) | not started |
 | CERT-13 | The provenance builder of the core is quadratic; an index brings it near the checker's cost | done 2026-10-23, zil-lean `1614a4e`; the traces of every model here are byte-identical before and after |

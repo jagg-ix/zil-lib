@@ -624,8 +624,9 @@ This is the result of a checker that is tested but not yet verified in Lean (doc
 ### A second checker, with a proof
 
 The core (zil-lean) has a certificate checker for its Lean-embedded Datalog with a soundness theorem. `Zil.Datalog.checkCertificate_sound`
-says that when it accepts a certificate, the facts of the certificate are a stable model of the program, and for a program without
-negation the least model (`spec/datalog-semantics-v1.md` in the core). `--verified` translates the program and the certificate of the
+says that when it accepts a certificate, the facts of the certificate are a stable model of the program, `checkCertificate_unique` that
+no other set of facts is one, and `checkCertificate_leastModel` that for a program without negation it is the least model
+(`spec/datalog-semantics-v1.md` in the core). `--verified` translates the program and the certificate of the
 engine into that representation (`ZilLib/Certify/Verified.lean`) and gives them to that checker as well:
 
 ```sh
@@ -786,8 +787,8 @@ NOT certified: 1 problem(s)
   the list is justified, and one that is not in the list is correctly absent.
 * It does not say that the model means what you intended, and it trusts the parser, which decides what the facts and rules are.
 * It is not a proof about this checker. The paper's checker is verified in Lean; this one is tested (`lake exe zilLibCertifyTests`).
-  With `--verified` the core's proved checker also accepts the certificate, behind a translation that is trusted. That a certified
-  program with negation yields *the* perfect model also needs that a stratified program has one stable model, which is not proved
+  With `--verified` the core's proved checker also accepts the certificate, behind a translation that is trusted. That checker proves
+  that the facts are the only stable model of the program; that this is the perfect model that the engine computes is not proved
   (`docs/certifying-datalog.md`, CERT-10).
 
 ## Repository layout
