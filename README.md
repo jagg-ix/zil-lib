@@ -606,7 +606,7 @@ a file, and checks two things:
 
 If both hold, the facts in the list are exactly the facts that the model entails. The paper proves its checker correct in Lean for rules
 without negation, and names negation as future work. This checker also handles ZIL's stratified negation, by the argument in
-`docs/certifying-datalog.md`. It is tested, including by injecting faults, but it is not yet verified in Lean.
+`docs/certifying-datalog.md`. It is tested, including by injecting faults, but it is not itself verified in Lean; the core has a second checker that is (see *A second checker, with a proof*).
 
 The shop model from the tour is certified:
 
@@ -620,6 +620,30 @@ closure check: 22 rule instances examined
 certified: every fact is justified, and no rule derives a fact that is missing, so the facts are exactly those the program entails.
 This is the result of a checker that is tested but not yet verified in Lean (docs/certifying-datalog.md, CERT-10).
 ```
+
+### A second checker, with a proof
+
+The core (zil-lean) has a certificate checker for its Lean-embedded Datalog with a soundness theorem. `Zil.Datalog.checkCertificate_sound`
+says that when it accepts a certificate, the facts of the certificate are a stable model of the program, and for a program without
+negation the least model (`spec/datalog-semantics-v1.md` in the core). `--verified` translates the program and the certificate of the
+engine into that representation (`ZilLib/Certify/Verified.lean`) and gives them to that checker as well:
+
+```sh
+zillib certify examples/tour/01-blast-radius.zc --verified
+```
+
+```text
+certificate: 31 facts, 9 from the database and 22 derived
+closure check: 22 rule instances examined
+proved checker (Zil.Datalog.checkCertificate, theorem checkCertificate_sound): accepted
+certified: every fact is justified, and no rule derives a fact that is missing, so the facts are exactly those the program entails.
+The second checker has a soundness theorem in Lean (docs/certifying-datalog.md, CERT-10); the translation to its representation is trusted.
+```
+
+The two checkers have to agree: if they do not, the command says so and exits with status 1. What stays trusted is the translation, the
+functions that match a rule against facts (`unify` and `instantiate`), and the parser. The proved checker is a plain list implementation
+written for the proof: the 18 expanded libraries (5270 facts) take about a second each at most, and a program of many thousands of rule
+instances would take far longer.
 
 A model that uses macros from a library is read with that library, as `zil expand` reads it. `--lib PATH` prepends the `.zc` files of a
 directory in name order, or one `.zc` file, and may be given more than once. The certificate is that of the expanded program, which is the
@@ -761,8 +785,10 @@ NOT certified: 1 problem(s)
 * It says that, for this model, the list of facts is complete and every fact in it has a valid derivation. A query answer that is a fact in
   the list is justified, and one that is not in the list is correctly absent.
 * It does not say that the model means what you intended, and it trusts the parser, which decides what the facts and rules are.
-* It is not a proof about the checker. The paper's checker is verified in Lean; this one is tested (`lake exe zilLibCertifyTests`) and
-  `docs/certifying-datalog.md` lists the proof as a target.
+* It is not a proof about this checker. The paper's checker is verified in Lean; this one is tested (`lake exe zilLibCertifyTests`).
+  With `--verified` the core's proved checker also accepts the certificate, behind a translation that is trusted. That a certified
+  program with negation yields *the* perfect model also needs that a stratified program has one stable model, which is not proved
+  (`docs/certifying-datalog.md`, CERT-10).
 
 ## Repository layout
 

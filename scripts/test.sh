@@ -131,10 +131,13 @@ rows=0; unsound=""
 while IFS=$'\t' read -r name library model; do
   case "$library" in -) options=() ;; @*) options=(--lib "${library#@}") ;; *) options=(--lib "$library") ;; esac
   rows=$((rows + 1))
-  lake exe zilLib certify "$model" ${options[@]+"${options[@]}"} >"$work/row.out" 2>"$work/row.err" || unsound="$unsound $name"
+  lake exe zilLib certify "$model" ${options[@]+"${options[@]}"} --verified >"$work/row.out" 2>"$work/row.err" || unsound="$unsound $name"
+  grep -q "proved checker.*accepted" "$work/row.out" || unsound="$unsound $name(proved)"
 done < <(grep -v "^#" spec/macro-extension-matrix.tsv)
-[[ "$rows" -eq 18 && -z "$unsound" ]] && pass "certify: all $rows models of spec/macro-extension-matrix.tsv, read with their libraries, are certified" \
+[[ "$rows" -eq 18 && -z "$unsound" ]] && pass "certify: all $rows models of spec/macro-extension-matrix.tsv, read with their libraries, are certified, and accepted by the proved checker" \
   || fail "certify: $rows rows read, not certified:$unsound"
+exit_of 0 "certify: the tour model is also accepted by the proved checker (--verified)" lake exe zilLib certify examples/tour/01-blast-radius.zc --verified
+grep -q 'proved checker.*accepted' "$work/command.out" && pass "certify: the proved checker's verdict is printed" || fail "certify: the proved checker's verdict is missing"
 exit_of 2 "certify: a model that uses a library macro, read without the library" lake exe zilLib certify examples/aws-model-extension-with-icons.zc
 grep -q 'unknown macro AWS_PROVIDER' "$work/command.err" && pass "certify: the missing macro is named" || fail "certify: the missing macro is not named"
 exit_of 0 "certify: a library given as one file" lake exe zilLib certify examples/aws-model-extension-with-icons.zc --lib libsets/aws-model/aws-model-macros.zc

@@ -1,10 +1,11 @@
 import ZilLib.Certify
+import ZilLib.Certify.Verified
 import ZilLib.Model
 
 /-!
 # `zilLib certify`
 
-    zilLib certify MODEL.zc [TRACE.txt] [--lib PATH]... [--fuel N] [--limit N]
+    zilLib certify MODEL.zc [TRACE.txt] [--lib PATH]... [--fuel N] [--limit N] [--verified]
 
 Checks that the facts of a derivation certificate are exactly the facts the model entails. Without `TRACE.txt` the certificate is the
 core's own provenance trace of the model (the engine checked against an independent checker); with it, the certificate is a
@@ -16,14 +17,19 @@ A model that uses macros from a library is read with that library: `--lib PATH` 
 as the core's `--lib DIR` reads them) or one `.zc` file, and may be repeated, in order. Without `--lib` the model is read as it is
 and has to define its macros itself. The certificate is then that of the expanded program, which is what the engine runs.
 
-Exit codes: 0 the certificate passes both checks, 1 it does not, 2 the model or the certificate cannot be read.
+`--verified` also gives the certificate to the checker of the core that has a soundness theorem (`Zil.Datalog.checkCertificate`), after
+translating the program and the certificate into the Lean-embedded Datalog (`ZilLib.Certify.Verified`). That checker is a plain list
+implementation: use it on programs of some hundreds of facts. If the two checkers disagree, that is reported and the exit status is 1.
+
+Exit codes: 0 the certificate passes both checks, 1 it does not, 2 the model or the certificate cannot be read (or, with `--verified`,
+cannot be translated).
 -/
 
 namespace ZilLib.CLI.CertifyCommands
 
 open ZilLib.Certify
 
-def usage : String := "zilLib certify MODEL.zc [TRACE.txt] [--lib PATH]... [--fuel N] [--limit N]"
+def usage : String := "zilLib certify MODEL.zc [TRACE.txt] [--lib PATH]... [--fuel N] [--limit N] [--verified]"
 
 private def number? (name : String) (args : List String) : Except String (Option Nat) :=
   match args.dropWhile (· != name) with
@@ -81,9 +87,22 @@ def run (args : List String) : IO UInt32 := do
   let report := check program.facts program.allRules certificate limit
   IO.println s!"certificate: {report.facts} facts, {report.database} from the database and {report.derived} derived"
   IO.println s!"closure check: {report.instances} rule instances examined"
+  let mut proved := false
+  if args.contains "--verified" then
+    match ZilLib.Certify.Verified.check program.facts program.allRules certificate with
+    | .error problem => IO.eprintln s!"{model}: cannot translate for the proved checker: {problem}"; return 2
+    | .ok accepted =>
+        IO.println s!"proved checker (Zil.Datalog.checkCertificate, theorem checkCertificate_sound): {if accepted then "accepted" else "refused"}"
+        if accepted != report.certified then
+          IO.println "the two checkers disagree; one of them is wrong, and the certificate is not certified"
+          return 1
+        proved := accepted
   if report.certified then
     IO.println "certified: every fact is justified, and no rule derives a fact that is missing, so the facts are exactly those the program entails."
-    IO.println "This is the result of a checker that is tested but not yet verified in Lean (docs/certifying-datalog.md, CERT-10)."
+    if proved then
+      IO.println "The second checker has a soundness theorem in Lean (docs/certifying-datalog.md, CERT-10); the translation to its representation is trusted."
+    else
+      IO.println "This is the result of a checker that is tested but not yet verified in Lean (docs/certifying-datalog.md, CERT-10)."
     return 0
   IO.println s!"NOT certified: {report.problemCount} problem(s){if report.problemCount > report.problems.size then s!", the first {report.problems.size} shown" else ""}"
   for problem in report.problems do

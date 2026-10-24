@@ -1,5 +1,6 @@
 import ZilLib.Certify
 import ZilLib.LeanFacts
+import ZilLib.Certify.Verified
 import ZilLib.Model
 import ZilLib.Test.Harness
 
@@ -45,12 +46,17 @@ private def exponential (n : Nat) : String :=
 
 private def fact (s r o : String) : RelExpr := .mk' (.ground s.toName) r.toName (.ground o.toName)
 
+/-- Does the checker with a soundness theorem (`Zil.Datalog.checkCertificate`) accept the certificate, after translation? -/
+private def accepted (program : Zil.Program) (cert : Certificate) : Bool :=
+  match Verified.check program.facts program.allRules cert with | .ok answer => answer | .error _ => false
+
 private def positiveTests (t : Tally) : IO Unit := do
   let blast ← ZilLib.loadProgram "examples/tour/01-blast-radius.zc"
   let blastCertificate ← certificate blast
   let report := check blast.facts blast.allRules blastCertificate
   t.expect "the tour model: the engine's trace is certified" report.certified (String.intercalate "; " (report.problems.map (·.detail)).toList)
   t.expect "the tour model: 9 facts from the database, 22 derived" (report.database == 9 && report.derived == 22)
+  t.expect "the tour model: accepted by the proved checker" (accepted blast blastCertificate)
   -- a model with negation: single_points uses NOT; the closure check must have looked at instances that the negation removed
   t.expect "the tour model: the closure check examined the rule instances" (report.instances > 0)
   let goldens := (← System.FilePath.readDir "spec/macro-extension-golden").filter (·.fileName.endsWith ".expanded.zc")
@@ -62,6 +68,7 @@ private def positiveTests (t : Tally) : IO Unit := do
     totalFacts := totalFacts + result.facts
     t.expect s!"{entry.fileName}: certified ({result.facts} facts)" result.certified
       (String.intercalate "; " (result.problems.map (·.detail)).toList)
+    t.expect s!"{entry.fileName}: accepted by the proved checker" (accepted model cert)
   t.expect "all expanded macro libraries were checked" (goldens.size == 18) s!"{goldens.size} files"
   IO.println s!"      {totalFacts} facts in {goldens.size} expanded libraries"
   -- the paper's example 3: the proof tree of trans(0,20) is exponential, the graph is not
@@ -148,6 +155,45 @@ private def faultTests (t : Tally) : IO Unit := do
   let malformed := good.set! 0 { good[0]! with premises := #[1] }
   t.expect "a database fact that names premises is refused" ((kinds (judge malformed)).contains "malformed")
   t.expect "the certificate itself is still certified after all that" (judge good).certified
+  -- the checker with a soundness theorem refuses every one of these, and accepts the original
+  t.expect "proved checker: the original is accepted" (accepted blast good)
+  let derivedWithTwo := twoPremises.headD 0
+  let mutants : List (String × Certificate) :=
+    [("a node that uses itself", selfPremise), ("a derived fact the rule does not give", wrongFact),
+     ("a rule the program does not have", wrongRule), ("a database fact from nowhere", invented),
+     ("a fact a negative premise forbids", forbidden), ("a derived fact left out", missingLast),
+     ("a derived fact whose premises are in another order", good.set! derivedWithTwo { good[derivedWithTwo]! with
+        premises := #[good[derivedWithTwo]!.premises[1]!, good[derivedWithTwo]!.premises[0]!] })]
+  for (name, mutant) in mutants do
+    t.expect s!"proved checker: refuses {name}" (!accepted blast mutant)
+  -- two things the main checker refuses and the proved checker has no reason to: a fact that appears twice, and a database fact that
+  -- names premises. The set of facts is still a stable model in both cases, and a stable model is all that the proved checker says.
+  t.expect "proved checker: a fact twice is the same set, and is accepted" (accepted blast (good.push good[0]!))
+  t.expect "proved checker: the premises of a database fact carry no claim, and are ignored" (accepted blast malformed)
+  t.expect "proved checker: refuses a database fact that the certificate lacks"
+    (match Verified.check (blast.facts.push extraFact) blast.allRules good with | .ok answer => !answer | .error _ => false)
+
+/-- What the translation to the Lean-embedded Datalog keeps apart, and what it refuses. -/
+private def translationTests (t : Tally) : IO Unit := do
+  t.expect "two names that print alike are different strings" (Verified.nameText (Lean.Name.mkSimple "a.b") != Verified.nameText `a.b)
+  t.expect "a numeric component and a text one are different" (Verified.nameText (Lean.Name.mkNum `a 1) != Verified.nameText (Lean.Name.mkStr `a "1"))
+  let attr (key : Lean.Name) (value : AttrValue) : Attribute := { key, value }
+  let relation (attrs : Array Attribute) : RelExpr := { subject := .ground `a, relation := `r, object := .ground `b, attrs }
+  let atom (attrs : Array Attribute) := Verified.toAtom (relation attrs)
+  t.expect "attributes in another order give the same atom"
+    (match atom #[attr `x (.integer 1), attr `y (.boolean true)], atom #[attr `y (.boolean true), attr `x (.integer 1)] with
+      | .ok left, .ok right => left == right
+      | _, _ => false)
+  t.expect "text and a decimal number with the same characters give different atoms"
+    (match atom #[attr `x (.text "1.0")], atom #[attr `x (.decimal "1.0")] with
+      | .ok left, .ok right => left != right
+      | _, _ => false)
+  t.expect "a node and text with the same characters give different atoms"
+    (match atom #[attr `x (.term (.ground `v))], atom #[attr `x (.text "v")] with
+      | .ok left, .ok right => left != right
+      | _, _ => false)
+  t.expect "two attributes with one key are refused" (match atom #[attr `x (.integer 1), attr `x (.integer 2)] with | .error _ => true | .ok _ => false)
+  t.expect "a fact with a variable is refused" (match Verified.toAtom (.mk' (.variable `x) `r (.ground `b)) with | .error _ => true | .ok _ => false)
 
 private def stratificationTests (t : Tally) : IO Unit := do
   let rule (name : String) (premise negative : String) (head : String) : Rule :=
@@ -248,6 +294,7 @@ private def leanFactTests (t : Tally) : IO Unit := do
 def run : IO Bool := do
   let t ← Tally.new
   leanFactTests t
+  translationTests t
   matchingTests t
   stratificationTests t
   positiveTests t

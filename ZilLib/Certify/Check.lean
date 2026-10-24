@@ -21,8 +21,10 @@ Two checks, which together say that the facts of the certificate are exactly the
 Negation is not in the paper (its section 8 lists it as future work and says that certificate checkers for stratified Datalog do not
 exist). For a stratified program, a set of facts that passes both checks, with negative premises read against the set itself, is a
 stable model of the program (the set is the least model of its reduct), and a stratified program has one stable model, the perfect
-model, which is what the engine computes. The checker also checks that the program is stratified. This argument is on paper only; the
-checker is not verified in Lean (target CERT-10).
+model, which is what the engine computes. The checker also checks that the program is stratified. That a set which passes is a stable
+model is proved in Lean for the Lean-embedded Datalog (`Zil.Datalog.checkCertificate_sound`), and `Verified.lean` runs that checker on a
+translation; that a stratified program has one stable model is on paper only, and this checker is not itself verified in Lean (target
+CERT-10).
 
 What is trusted: this code, the core's parser, which says what the program and its database are, and the reader of the certificate.
 The checker matches terms with its own functions, not the engine's.
