@@ -150,6 +150,7 @@ table) and `docs/move-libsets.md` (the LIB table) are updated in the same change
 | Batch | Targets | Why here | Done when |
 |---|---|---|---|
 | 0 | the M3 decision point; the ordering of the open questions | `docs/apalache-plan.md` says Track A beyond M3 continues only if the induction check is useful on models other than the one it was written on | done 2026-10-24: three invented models (`TwoProcLock`, `TokenArbiter`, `RingBuffer`) qualified with Apalache 0.62.4; decision resolved as GO in `docs/apalache-plan.md` and commands documented in `docs/tool-notes.md` |
+| S | TS-00 to TS-05 | a semantic transition-system layer and a second, independent backend (SMT through PySMT) come before the Apalache lowering, which then targets the same layer | each as the TS table says; TS-00 is accepted by the maintainer before TS-01 starts |
 | 1 | APL-00, APL-10, APL-11 | nothing is lowered before the contract is written and accepted; the IR and its printer are needed by every later step | the contract answers the seven open questions below, with the reason for each; the IR round-trips on twelve hand-written modules and matches golden bytes; the printed text is accepted by the tool's own parser |
 | 2 | APL-12, APL-13, APL-14, APL-22, APL-23, CERT-12 | the lowering exists and agrees with the evaluator, then the tool's counterexamples are replayed | on 1,000 random programs from `ZilLib/Test/Differential.lean` the lowered program at length 0 has the engine's closure; a real counterexample is confirmed by replay and a fabricated one is refused |
 | 3 | APL-05 (= LIB-14), APL-30 | the vocabulary for saying what to check, then the first strategic result (S1) | S1 as the table says: the seeded flaw is found at N ≤ 3 and replayed |
@@ -162,6 +163,43 @@ Waits for the maintainer, not for a helper: LIB-10 (a project that pins the core
 repository); whether a pull request is merged or the target is pushed to `main`; a force push to the core's protected `main`; whether the
 engine and the Lean-embedded evaluator should treat a variable in an attribute pattern alike (the engine binds it only to a node, the
 evaluator to any value; `ZilLib/Certify/Verified.lean` refuses the difference today).
+
+## Transition systems, and an SMT backend through PySMT (proposed 2026-10-24)
+
+The idea: the semantics lives in Lean and the backends are interchangeable. A specification, written as TLA+ source or lowered from a ZIL
+program, becomes a value of a Lean type; that value has a meaning in Lean (so safety properties can be proved there as ordinary theorems)
+and is the input of each backend (Apalache, an SMT solver through PySMT, later others). The TLA+ source stays the authoritative text.
+
+```lean
+class TransitionSystem where
+  State : Type
+  Init : State → Prop
+  Next : State → State → Prop
+```
+
+Two points that the design needs and the sketch does not say. First, `State → State → Prop` cannot be sent to a solver: a function in Lean
+has no syntax to print. So there are two layers, a **deep embedding** `TSModule` (typed state variables, `Init` and `Next` as formulas over
+the variables and their primed copies, named invariants) that the backends read, and the class above, with `denote : TSModule →
+TransitionSystem` and a theorem that evaluating a formula agrees with its denotation. Second, the TLA+ front end needs SANY, which needs
+Java, and the build and the gate may not (Non-goals below): the front end writes a **snapshot** (JSON, with the SHA-256 of the source) by
+a command, and `tla_file "X.tla"` reads the snapshot and checks the hash; elaboration never starts a process.
+
+The fragment is the safety fragment: variables of sort Bool, Int and finite enumerations, `Init`, `Next` as conjunctions and disjunctions,
+`UNCHANGED`, `[Next]_vars`, and invariants. Temporal operators, fairness, `CHOOSE`, recursive operators and unbounded sets are refused with
+their location, and a refusal is the right answer.
+
+| ID | Target | Done when | Needs | Status |
+|---|---|---|---|---|
+| TS-00 | Contract | `spec/transition-system-v0.1.md` states the two layers, the fragment and what is refused, the assurance rule (a violation is reported only when Lean's reference replays it; a solver result is `externally-attested`, never `kernel-backed`) and the build rule (no Java, Python or solver in the build or the gate); the maintainer accepts it | none | not started |
+| TS-01 | Types and denotation | `ZilLib/TransitionSystem.lean`: the class, `TSModule`, `denote`, the agreement theorem, a bounded reachability function in Lean (the reference for replay), and the counter (`x = 0`, `x' = x + 1`, invariant `x ≥ 0`) with the invariant proved in Lean as an ordinary theorem by induction | TS-00 | not started |
+| TS-02 | TLA+ front end | `zilLib tla export X.tla` runs SANY's XML exporter (the tool the machine has) and writes `X.tla.json`; Lean reads it to a `TSModule`; `tla_file "X.tla"` checks the hash and says to run the export when it is stale. `Counter` and two more invented modules import; a construct outside the fragment is refused with its location. Optional: a Lean parser for the fragment, so that `tla%{ ... }` with inline text works without Java, tested against the snapshots of the same modules | TS-00, TS-01 | not started |
+| TS-03 | PySMT backend | from a `TSModule`: SMT-LIB 2 text and a PySMT script for bounded model checking to depth k and for k-induction (base case and step, as `zilLib apalache induct` does); a model of a violation is read back as a trace and replayed with TS-01's reference, and reported only if Lean confirms; `ZIL-EVIDENCE/1` records the solver and PySMT versions, the hash of the formula and the bounds. Tests that start Python run only with `--with-tool` and say *skipped: pysmt not found* otherwise; PySMT lives in a virtual environment with a pinned version and is never vendored | TS-01 | not started |
+| TS-04 | Two backends agree | on `Counter`, `LockStep` and three invented models (batch 0), PySMT's verdict, Apalache's verdict (through the TLA+ text) and Lean's reference agree on the invariant and on the injected defect; a disagreement is filed as a defect of one backend with both traces | TS-03, batch 0 | not started |
+| TS-05 | ZIL as a source | the lowering of APL-12 to APL-14 targets `TSModule`; Apalache and PySMT both consume it; APL-10's IR is the emitter from `TSModule` to Apalache. APL-00 says so | TS-01, APL-00 | not started |
+| TS-06 | Other backends (proposed, not assigned) | Soufflé, OCaml and others from `TSModule`, each tested differentially against Lean's reference | TS-04 | not started |
+
+SMT-LIB is also what the core's `PROOF_OBLIGATION` with `tool=z3` and its external-solver extension (`examples/extensions/external-solver-*.json`)
+already take, so TS-03's `.smt2` output can be given to that extension as it is.
 
 ## Open questions for APL-00
 
