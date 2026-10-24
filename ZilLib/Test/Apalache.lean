@@ -1,5 +1,6 @@
 import ZilLib.Apalache
 import ZilLib.CLI.ApalacheCommands
+import ZilLib.Test.Harness
 
 /-!
 # Tests of the Apalache modules
@@ -13,21 +14,9 @@ namespace ZilLib.Test.Apalache
 
 open ZilLib.Apalache Zil.Json
 
-structure Tally where
-  passed : IO.Ref Nat
-  failed : IO.Ref (Array String)
-
-def Tally.expect (tally : Tally) (name : String) (ok : Bool) (detail : String := "") : IO Unit := do
-  if ok then
-    tally.passed.modify (· + 1)
-    IO.println s!"PASS  {name}"
-  else
-    tally.failed.modify (·.push name)
-    IO.eprintln s!"FAIL  {name}{if detail.isEmpty then "" else ": " ++ detail}"
+open ZilLib.Test
 
 private def fixtures : System.FilePath := "test/fixtures/apalache"
-
-private def contains (text needle : String) : Bool := (text.splitOn needle).length > 1
 
 private def sameJson (a b : J) : Bool :=
   match Zil.Json.canonical a, Zil.Json.canonical b with
@@ -338,15 +327,12 @@ private def realToolTests (t : Tally) : IO Unit := do
 
 /-- Run the tests; the last group only with `withTool`. -/
 def run (withTool : Bool) : IO Bool := do
-  let t : Tally := { passed := ← IO.mkRef 0, failed := ← IO.mkRef #[] }
+  let t ← Tally.new
   traceTests t
   runnerTests t
   evidenceTests t
   inductionTests t
   if withTool then realToolTests t
-  let passed ← t.passed.get
-  let failed ← t.failed.get
-  IO.println s!"{passed} passed, {failed.size} failed"
-  pure failed.isEmpty
+  t.finish
 
 end ZilLib.Test.Apalache
