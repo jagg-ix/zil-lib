@@ -2,6 +2,7 @@ examples/aws-model-extension-with-icons.zc	rejected	line 12:1: unknown macro AWS
 examples/aws-namespace-compat.zc	rejected	line 9:1: unknown macro NS_DIMENSION
 examples/bitemporal-history-replay.zc	rejected	line 10:1: unknown macro BT_TIMEPOINT
 examples/certify/chain.zc	accepted	
+examples/certify/lean-facts.zc	rejected	line 2:1: tuple fact must end with '.'
 examples/config-declarative-macros.zc	rejected	line 9:1: unknown macro CFG_DOC
 examples/diff-patch-demo.zc	rejected	line 41:1: unknown macro SNAPSHOT
 examples/discovery-api/sample-model.zc	accepted	

@@ -124,6 +124,7 @@ byte-identical, and the models that are refused are refused in the same way. A c
 | CERT-11 | A JSON encoding of certificates like the paper's, so that a trace from Nemo or Soufflé can be checked against a ZIL model; relations are ternary here (`subject#relation@object`) with attributes | not started |
 | CERT-12 | Replay of an Apalache counterexample: the trace is mapped to a set of facts and checked with the same matching and closure functions (APL-22) | not started |
 | CERT-13 | The provenance builder of the core is quadratic; an index brings it near the checker's cost | done 2026-10-23, zil-lean `1614a4e`; the traces of every model here are byte-identical before and after |
+| CERT-14 | Read fact bases written as `zil_fact` lines (the line form of the Lean command) in `.zc` files, which the core's parser refuses | done 2026-10-23, `ZilLib/LeanFacts.lean`; a fact over several lines or a string with an escape is an error |
 
 ## The note's targets, and ours
 

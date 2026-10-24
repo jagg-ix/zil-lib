@@ -1,4 +1,5 @@
 import ZilLib.Certify
+import ZilLib.LeanFacts
 import ZilLib.Model
 import ZilLib.Test.Harness
 
@@ -212,9 +213,41 @@ private def textTests (t : Tally) : IO Unit := do
   refuses "an origin row that is not understood is refused" "fact\t0\t0\trel\tnode:a\tr\tnode:b\t\norigin\t0\tmagic\n" "not understood"
   refuses "a premise that is not a number is refused" "fact\t0\t0\trel\tnode:a\tr\tnode:b\t\norigin\t0\trule\tx\ta\t\t\n" "not a fact number"
 
+/-- The lines of the Lean command `zil_fact` are read as the `.zc` facts they mean, and nothing else is read as one. -/
+private def leanFactTests (t : Tally) : IO Unit := do
+  let line (text : String) : Option String := match ZilLib.LeanFacts.line? text with | .ok fact => fact | .error _ => some "error"
+  t.expect "zil_fact: two nodes" (line "zil_fact node(function.detect) ⟶[kind] node(framework.function)" ==
+    some "function.detect#kind@framework.function.")
+  t.expect "zil_fact: a string, with the spacing of the generated files" (line "  zil_fact node(tier.Tier1)   ⟶[name]  \"Tier 1: Partial\"  " ==
+    some "tier.Tier1#name@\"Tier 1: Partial\".")
+  t.expect "zil_fact: a hyphen in a name" (line "zil_fact node(threat.TID-301) ⟶[kind] node(threat)" == some "threat.TID-301#kind@threat.")
+  t.expect "zil_fact: a trailing comment" (line "zil_fact node(a) ⟶[r] node(b) // why" == some "a#r@b.")
+  t.expect "a comment, a fact and a header are not zil_fact lines" (["// zil_fact node(a)", "a#r@b.", "MODULE m.", "", "zil_factory x"].all (line · == none))
+  let refused (text : String) : Bool := match ZilLib.LeanFacts.line? text with | .error _ => true | .ok _ => false
+  t.expect "zil_fact: no arrow" (refused "zil_fact node(a) node(b)")
+  t.expect "zil_fact: a subject that is not a node" (refused "zil_fact a ⟶[r] node(b)")
+  t.expect "zil_fact: a relation that is not closed" (refused "zil_fact node(a) ⟶[r node(b)")
+  t.expect "zil_fact: an object that is neither a node nor a string" (refused "zil_fact node(a) ⟶[r] 42")
+  t.expect "zil_fact: a string that is not closed" (refused "zil_fact node(a) ⟶[r] \"open")
+  t.expect "zil_fact: a string with an escape" (refused "zil_fact node(a) ⟶[r] \"a\\\"b\"")
+  t.expect "zil_fact: text after the object" (refused "zil_fact node(a) ⟶[r] node(b) node(c)")
+  t.expect "zil_fact: a fact on several lines" (refused "zil_fact")
+  -- the lines of a file keep their numbers, and the error says which line
+  let text := "MODULE m.\n\nzil_fact node(a) ⟶[r] node(b)\nzil_fact node(c) ⟶[r]\n"
+  t.expect "a translated file has the lines it had" (match ZilLib.LeanFacts.translate "MODULE m.\n\nzil_fact node(a) ⟶[r] node(b)\n" with
+    | .ok out => out == "MODULE m.\n\na#r@b.\n" | .error _ => false)
+  t.expect "the error names the line" (match ZilLib.LeanFacts.translate text with
+    | .error problem => contains problem "line 4:" | .ok _ => false)
+  -- facts and rules together: the fact lines and a .zc rule give the closure, which the checker certifies
+  let loaded ← program "MODULE m.\nzil_fact node(n.a) ⟶[next] node(n.b)\nzil_fact node(n.b) ⟶[next] node(n.c)\nn.b#next@n.d.\nRULE r:\nIF ?x#next@?y\nTHEN ?y#prev@?x.\n"
+  t.expect "zil_fact lines and .zc lines make one program" (loaded.facts.size == 3 && loaded.rules.size == 1)
+  let cert ← certificate loaded
+  t.expect "that program is certified" (check loaded.facts loaded.allRules cert).certified
+
 /-- Run the tests. -/
 def run : IO Bool := do
   let t ← Tally.new
+  leanFactTests t
   matchingTests t
   stratificationTests t
   positiveTests t

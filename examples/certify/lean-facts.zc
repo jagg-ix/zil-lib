@@ -1,0 +1,10 @@
+MODULE examples.certify.lean_facts.
+
+// The facts are written as the Lean command zil_fact reads them. The rule is ordinary .zc.
+zil_fact node(service.web) ⟶[calls] node(service.api)
+zil_fact node(service.api) ⟶[calls] node(service.db)
+zil_fact node(service.db) ⟶[label] "primary store"
+
+RULE calls_are_transitive:
+IF ?a#calls@?b AND ?b#calls@?c
+THEN ?a#calls@?c.

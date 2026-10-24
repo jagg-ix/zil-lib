@@ -147,6 +147,12 @@ cmp -s "$work/three-files.out" "$work/directory.out" && pass "certify: those thr
 exit_of 2 "certify: --lib without a path" lake exe zilLib certify examples/tiny.zc --lib
 exit_of 2 "certify: --lib with a directory that has no .zc file" lake exe zilLib certify examples/tiny.zc --lib test/fixtures/certify
 exit_of 2 "certify: --lib with a path that does not exist" lake exe zilLib certify examples/tiny.zc --lib "$work/absent"
+exit_of 0 "certify: facts written as zil_fact lines, with a rule in .zc" lake exe zilLib certify examples/certify/lean-facts.zc
+grep -q '4 facts, 3 from the database and 1 derived' "$work/command.out" && pass "certify: the three zil_fact lines are facts and the rule derived one more" \
+  || fail "certify: the zil_fact lines were not read as three facts"
+printf 'MODULE m.\nzil_fact node(a) ⟶[r]\n' >"$work/broken-lines.zc"
+exit_of 2 "certify: a zil_fact line in another shape is refused" lake exe zilLib certify "$work/broken-lines.zc"
+grep -q 'line 2:' "$work/command.err" && pass "certify: the refusal names the line" || fail "certify: the refusal does not name the line"
 
 # 6. the libraries
 if [[ "$full" -eq 1 ]]; then

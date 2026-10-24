@@ -647,6 +647,39 @@ exit status 2
 
 All 18 rows of `spec/macro-extension-matrix.tsv` are certified this way, each with its library; `scripts/test.sh` checks them.
 
+Tools that generate facts often write them in the line form that the Lean command `zil_fact` reads, into a file with the extension `.zc`:
+
+```zil
+zil_fact node(service.web) ⟶[calls] node(service.api)
+zil_fact node(service.api) ⟶[calls] node(service.db)
+zil_fact node(service.db) ⟶[label] "primary store"
+```
+
+The core's `.zc` parser does not read that form:
+
+```sh
+zil trace examples/certify/lean-facts.zc - 2>&1 || echo "exit status $?"
+```
+
+```text
+line 2:1: tuple fact must end with '.'
+  zil_fact node(service.web) ⟶[calls] node(service.api)
+exit status 1
+```
+
+`zilLib` does. It rewrites each such line to the fact it means (`service.web#calls@service.api.`), keeps the numbers of the lines, and
+reads the rest of the file as usual, so facts in this form and ordinary `.zc` rules can be mixed. A `zil_fact` line in another shape, for
+example a fact written over several lines, is an error.
+
+```sh
+zillib certify examples/certify/lean-facts.zc | head -2
+```
+
+```text
+certificate: 4 facts, 3 from the database and 1 derived
+closure check: 1 rule instances examined
+```
+
 ### A finding: the engine used to stop early on a long chain
 
 The first time this checker ran on a long chain it found a defect in the engine. The engine applies the rules in rounds, and it used to stop
@@ -743,6 +776,7 @@ NOT certified: 1 problem(s)
 | `ZilLib/CLI/ApalacheCommands.lean` | the `zilLib apalache` commands |
 | `ZilLib/Certify/` | the certificate checker: `Check.lean` (soundness, closure, stratification) and `Text.lean` (reads a provenance report) |
 | `ZilLib/CLI/CertifyCommands.lean` | the `zilLib certify` command |
+| `ZilLib/LeanFacts.lean` | the reader of facts written as `zil_fact` lines |
 | `examples/certify/` | the chain model of the engine finding |
 | `test/fixtures/certify/` | the report that the engine printed for it before the fix |
 | `examples/tour/` | the four example models of the tour and the shell helper functions |
